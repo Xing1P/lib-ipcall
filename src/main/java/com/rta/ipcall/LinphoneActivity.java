@@ -954,7 +954,6 @@ public class LinphoneActivity extends LinphoneGenericActivity implements OnClick
 
 	@Override
 	public void setAddresGoToDialerAndCall(String number, String name, Uri photo) {
-		//TOGO: Genius
 //		Bundle extras = new Bundle();
 //		extras.putString("SipUri", number);
 //		extras.putString("DisplayName", name);

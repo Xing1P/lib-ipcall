@@ -162,7 +162,7 @@ public final class LinphoneService extends Service {
 
 		@Override
 		public synchronized void onActivityCreated(Activity activity, Bundle savedInstanceState) {
-			Log.i("Activity createdcreated:" + activity);
+			Log.i("Activity created:" + activity);
 			if (!activities.contains(activity))
 				activities.add(activity);
 		}
@@ -328,7 +328,6 @@ public final class LinphoneService extends Service {
 		}
 		mNotif = Compatibility.createNotification(this, mNotificationTitle, "", R.drawable.linphone_notification_icon, R.mipmap.ic_launcher, bm, mNotifContentIntent, true,notifcationsPriority);
 
-		//TODO: Genius
 		LinphoneManager.createAndStart(LinphoneService.this);
 
 		instance = this; // instance is ready once linphone manager has been created

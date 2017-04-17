@@ -124,8 +124,7 @@ public class LinphonePreferences {
 
 	// App settings
 	public boolean isFirstLaunch() {
-		//return getConfig().getBool("app", "first_launch", true);
-		return false;
+		return getConfig().getBool("app", "first_launch", true);
 	}
 
 	public void firstLaunchSuccessful() {
@@ -1327,41 +1326,6 @@ public class LinphonePreferences {
 		return getConfig().getString("in-app-purchase", "server_url", null);
 	}
 
-	/*
-	public Purchasable getInAppPurchasedItem() {
-		String id = getConfig().getString("in-app-purchase", "purchase_item_id", null);
-		String payload = getConfig().getString("in-app-purchase", "purchase_item_payload", null);
-		String signature = getConfig().getString("in-app-purchase", "purchase_item_signature", null);
-		String username = getConfig().getString("in-app-purchase", "purchase_item_username", null);
-
-		Purchasable item = new Purchasable(id).setPayloadAndSignature(payload, signature).setUserData(username);
-		return item;
-	}
-
-	public void setInAppPurchasedItem(Purchasable item) {
-		if (item == null)
-			return;
-
-		getConfig().setString("in-app-purchase", "purchase_item_id", item.getId());
-		getConfig().setString("in-app-purchase", "purchase_item_payload", item.getPayload());
-		getConfig().setString("in-app-purchase", "purchase_item_signature", item.getPayloadSignature());
-		getConfig().setString("in-app-purchase", "purchase_item_username", item.getUserData());
-	}
-	*/
-
-	public ArrayList<String> getInAppPurchasables() {
-		ArrayList<String>  purchasables = new ArrayList<String>();
-		String list = getConfig().getString("in-app-purchase", "purchasable_items_ids", null);
-		if (list != null) {
-			for(String purchasable : list.split(";")) {
-				if (purchasable.length() > 0) {
-					purchasables.add(purchasable);
-				}
-			}
-		}
-		return purchasables;
-	}
-
 	public String getXmlrpcUrl(){
 		return getConfig().getString("assistant", "xmlrpc_url", null);
 	}
@@ -1395,7 +1359,7 @@ public class LinphonePreferences {
 	}
 
 	public String getActivityToLaunchOnIncomingReceived() {
-		return getConfig().getString("app", "incoming_call_activity", "com.rta.ipcall.LinphoneActivity");
+		return getConfig().getString("app", "incoming_call_activity", "org.linphone.LinphoneActivity");
 	}
 
 	public void setActivityToLaunchOnIncomingReceived(String name) {
