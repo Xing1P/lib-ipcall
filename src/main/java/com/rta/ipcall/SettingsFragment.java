@@ -489,6 +489,7 @@ public class SettingsFragment extends PreferencesListFragment {
 	}
 
 	private void initAudioSettings() {
+		//TODO: Genius Codec
 		PreferenceCategory codecs = (PreferenceCategory) findPreference(getString(R.string.pref_codecs_key));
 		codecs.removeAll();
 

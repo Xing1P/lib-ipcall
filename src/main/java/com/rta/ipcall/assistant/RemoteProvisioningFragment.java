@@ -57,6 +57,7 @@ public class RemoteProvisioningFragment extends Fragment implements OnClickListe
 		int id = v.getId();
 		
 		if (id == R.id.assistant_apply) {
+			//TODO: Genius Login
 			String url = remoteProvisioningUrl.getText().toString();
 			AssistantActivity.instance().displayRemoteProvisioningInProgressDialog();
 			LinphonePreferences.instance().setRemoteProvisioningUrl(url);

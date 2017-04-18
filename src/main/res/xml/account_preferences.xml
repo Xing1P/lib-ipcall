@@ -48,13 +48,13 @@
 			android:key="@string/pref_transport_key"
             android:persistent="false"/>
 
-        <EditTextPreference
-        	android:title="@string/pref_proxy"
+		<EditTextPreference
 			android:inputType="textUri"
-        	android:summary="@string/pref_help_proxy"
-            android:persistent="false"/>
+            android:persistent="false"
+			android:summary="@string/pref_help_proxy"
+			android:title="@string/pref_proxy" />
 
-        <CheckBoxPreference
+		<CheckBoxPreference
         	android:title="@string/pref_enable_outbound_proxy"
         	android:dialogMessage="@string/pref_help_outbound_proxy"
         	android:summary="@string/pref_help_outbound_proxy"
