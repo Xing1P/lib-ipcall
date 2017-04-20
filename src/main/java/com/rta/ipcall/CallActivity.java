@@ -614,6 +614,7 @@ public class CallActivity extends LinphoneGenericActivity implements OnClickList
 		}
 
 		if (id == R.id.video) {
+			//TODO:GEnius video
 			int camera = getPackageManager().checkPermission(Manifest.permission.CAMERA, getPackageName());
 			Log.i("[Permission] Camera permission is " + (camera == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));
 
@@ -625,6 +626,7 @@ public class CallActivity extends LinphoneGenericActivity implements OnClickList
 			}
 		}
 		else if (id == R.id.micro) {
+			//TODO: Mute
 			int recordAudio = getPackageManager().checkPermission(Manifest.permission.RECORD_AUDIO, getPackageName());
 			Log.i("[Permission] Record audio permission is " + (recordAudio == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));
 

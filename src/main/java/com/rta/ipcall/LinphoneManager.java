@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
@@ -28,6 +29,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.hardware.Sensor;
@@ -47,6 +49,7 @@ import android.os.Vibrator;
 import android.preference.CheckBoxPreference;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
+import android.support.v4.app.ActivityCompat;
 import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.Button;
@@ -163,6 +166,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 	private SensorManager mSensorManager;
 	private Sensor mProximity;
 	private boolean mProximitySensingEnabled;
+	private boolean alreadyAcceptedOrDeniedCall;
 
 	public String wizardLoginViewDomain = null;
 
@@ -563,6 +567,75 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		} else {
 			Log.e("Error: " + getString(R.string.error_network_unreachable));
 		}
+	}
+
+	public void pauseOrResumeCall(LinphoneCall call) {
+		LinphoneCore lc = LinphoneManager.getLc();
+		if (call != null && LinphoneManager.getLc().getCurrentCall() == call) {
+			lc.pauseCall(call);
+		} else if (call != null) {
+			if (call.getState() == State.Paused) {
+				lc.resumeCall(call);
+			}
+		}
+	}
+
+	public void setAlreadyAcceptedOrDeniedCall(boolean value)
+	{
+		alreadyAcceptedOrDeniedCall = value;
+	}
+
+
+
+	public void toggleVideo() {
+		final LinphoneCall call = LinphoneManager.getLc().getCurrentCall();
+		if (call == null) {
+			return;
+		}
+		boolean videoDisabled = isVideoEnabled(LinphoneManager.getLc().getCurrentCall());
+
+		if (videoDisabled) {
+			LinphoneCallParams params = LinphoneManager.getLc().createCallParams(call);
+			params.setVideoEnabled(false);
+			LinphoneManager.getLc().updateCall(call, params);
+		} else {
+			if (call.getRemoteParams() != null && !call.getRemoteParams().isLowBandwidthEnabled()) {
+				LinphoneManager.getInstance().addVideo();
+			} else {
+				Toast.makeText(mServiceContext, getString(R.string.error_low_bandwidth), Toast.LENGTH_LONG).show();
+			}
+		}
+	}
+
+	public void acceptCall()
+	{
+		/*
+		if (alreadyAcceptedOrDeniedCall) {
+			return;
+		}
+		alreadyAcceptedOrDeniedCall = true;
+
+		LinphoneCallParams params = LinphoneManager.getLc().createCallParams(mCall);
+
+		boolean isLowBandwidthConnection = !LinphoneUtils.isHighBandwidthConnection(LinphoneService.instance().getApplicationContext());
+
+		if (params != null) {
+			params.enableLowBandwidth(isLowBandwidthConnection);
+		}else {
+			Log.e("Could not create call params for call");
+		}
+
+		if (params == null || !LinphoneManager.getInstance().acceptCallWithParams(mCall, params)) {
+			// the above method takes care of Samsung Galaxy S
+			Toast.makeText(this, R.string.couldnt_accept_call, Toast.LENGTH_LONG).show();
+		} else {
+			if (!LinphoneActivity.isInstanciated()) {
+				return;
+			}
+			LinphoneManager.getInstance().routeAudioToReceiver();
+			LinphoneActivity.instance().startIncallActivity(mCall);
+		}
+		*/
 	}
 
 	private void resetCameraFromPreferences() {
@@ -1717,6 +1790,13 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 			servers[i++] = address.getHostAddress();
 		}
 		mLc.setDnsServers(servers);
+	}
+
+	private boolean isVideoEnabled(LinphoneCall call) {
+		if(call != null){
+			return call.getCurrentParams().getVideoEnabled();
+		}
+		return false;
 	}
 
 	@SuppressWarnings("serial")

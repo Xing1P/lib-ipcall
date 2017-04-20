@@ -21,6 +21,7 @@ package com.rta.ipcall;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Map;
 
 import com.rta.ipcall.compatibility.Compatibility;
 import org.linphone.core.LinphoneAddress;
@@ -61,6 +62,7 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.view.WindowManager;
 
 /**
@@ -78,6 +80,11 @@ import android.view.WindowManager;
  *
  */
 public final class LinphoneService extends Service {
+	/**
+	 * Extra key to contains infos about a sip call.<br/>
+	 */
+	public static final String EXTRA_CALL_INFO = "call_info";
+
 	/* Listener needs to be implemented in the Service as it calls
 	 * setLatestEventInfo and startActivity() which needs a context.
 	 */
@@ -127,6 +134,7 @@ public final class LinphoneService extends Service {
 	private WindowManager mWindowManager;
 	private LinphoneOverlay mOverlay;
 	private Application.ActivityLifecycleCallbacks activityCallbacks;
+	LinphoneCall callInfo;
 
 
 
@@ -841,6 +849,13 @@ public final class LinphoneService extends Service {
 	}
 
 
+	public LinphoneCall getExtraValue(String key)
+	{
+		if (key.equals(EXTRA_CALL_INFO))
+			return this.callInfo;
+		return null;
+	}
+
 	public void tryingNewOutgoingCallButAlreadyInCall() {
 	}
 
@@ -852,6 +867,40 @@ public final class LinphoneService extends Service {
 
 	public void onCallEncryptionChanged(final LinphoneCall call, final boolean encrypted,
 			final String authenticationToken) {
+	}
+
+	public Intent buildCallUiIntent(Context ctxt, LinphoneCall callInfo, String UI_CALL_PACKAGE, String action) {
+		// Resolve the package to handle call.
+
+		if(UI_CALL_PACKAGE == null) {
+			UI_CALL_PACKAGE = ctxt.getPackageName();
+			/*
+			try {
+				Map<String, DynActivityPlugin> callsUis = ExtraPlugins.getDynActivityPlugins(ctxt, SipManager.ACTION_SIP_CALL_FLOATING_UI);
+				String preferredPackage  = SipConfigManager.getPreferenceStringValue(ctxt, SipConfigManager.CALL_UI_PACKAGE, UI_CALL_PACKAGE);
+				String packageName = null;
+				boolean foundPref = false;
+				for(String activity : callsUis.keySet()) {
+					packageName = activity.split("/")[0];
+					if(preferredPackage.equalsIgnoreCase(packageName)) {
+						UI_CALL_PACKAGE = packageName;
+						foundPref = true;
+						break;
+					}
+				}
+				if(!foundPref && !TextUtils.isEmpty(packageName)) {
+					UI_CALL_PACKAGE = packageName;
+				}
+			}catch(Exception e) {
+				Log.e(THIS_FILE, "Error while resolving package", e);
+			}
+			*/
+		}
+		this.callInfo = callInfo;
+		Intent intent = new Intent(action);
+		intent.setPackage(UI_CALL_PACKAGE);
+		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+		return intent;
 	}
 }
 
