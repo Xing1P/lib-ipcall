@@ -96,11 +96,13 @@ public final class LinphoneService extends Service {
 
 	private static LinphoneService instance;
 
+	/*
 	private final static int NOTIF_ID=1;
 	private final static int INCALL_NOTIF_ID=2;
 	private final static int MESSAGE_NOTIF_ID=3;
 	private final static int CUSTOM_NOTIF_ID=4;
 	private final static int MISSED_NOTIF_ID=5;
+	*/
 
 	public static boolean isReady() {
 		return instance != null && instance.mTestDelayElapsed;
@@ -121,6 +123,7 @@ public final class LinphoneService extends Service {
 	private boolean mTestDelayElapsed = true; // no timer
 	private NotificationManager mNM;
 
+	/*
 	private Notification mNotif;
 	private Notification mIncallNotif;
 	private Notification mMsgNotif;
@@ -128,11 +131,12 @@ public final class LinphoneService extends Service {
 	private int mMsgNotifCount;
 	private PendingIntent mNotifContentIntent, mMissedCallsNotifContentIntent;
 	private String mNotificationTitle;
+	public static int notifcationsPriority = (Version.sdkAboveOrEqual(Version.API16_JELLY_BEAN_41) ? Notification.PRIORITY_MIN : 0);
+	*/
 	private boolean mDisableRegistrationStatus;
 	private LinphoneCoreListenerBase mListener;
-	public static int notifcationsPriority = (Version.sdkAboveOrEqual(Version.API16_JELLY_BEAN_41) ? Notification.PRIORITY_MIN : 0);
-	private WindowManager mWindowManager;
 	private LinphoneOverlay mOverlay;
+	private WindowManager mWindowManager;
 	private Application.ActivityLifecycleCallbacks activityCallbacks;
 	LinphoneCall callInfo;
 
@@ -264,20 +268,26 @@ public final class LinphoneService extends Service {
 		getApplication().registerActivityLifecycleCallbacks(activityCallbacks = new ActivityMonitor());
 	}
 
+	@Deprecated
 	public int getMessageNotifCount() {
-		return mMsgNotifCount;
+		//return mMsgNotifCount;
+		return 0;
 	}
 
+	@Deprecated
 	public void resetMessageNotifCount() {
-		mMsgNotifCount = 0;
+		//mMsgNotifCount = 0;
 	}
 
+	@Deprecated
 	private boolean displayServiceNotification() {
-		return LinphonePreferences.instance().getServiceNotificationVisibility();
+		//return LinphonePreferences.instance().getServiceNotificationVisibility();
+		return false;
 	}
 
+	@Deprecated
 	public void showServiceNotification() {
-		startForegroundCompat(NOTIF_ID, mNotif);
+		//startForegroundCompat(NOTIF_ID, mNotif);
 
 		LinphoneCore lc = LinphoneManager.getLcIfManagerNotDestroyedOrNull();
 		if (lc == null) return;
@@ -293,8 +303,9 @@ public final class LinphoneService extends Service {
 		}
 	}
 
+	@Deprecated
 	public void hideServiceNotification() {
-		stopForegroundCompat(NOTIF_ID);
+		//stopForegroundCompat(NOTIF_ID);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -304,7 +315,7 @@ public final class LinphoneService extends Service {
 
 		setupActivityMonitor();
 		// In case restart after a crash. Main in LinphoneActivity
-		mNotificationTitle = getString(R.string.service_name);
+		//mNotificationTitle = getString(R.string.service_name);
 
 		// Needed in order for the two next calls to succeed, libraries must have been loaded first
 		LinphonePreferences.instance().setContext(getBaseContext());
@@ -319,8 +330,9 @@ public final class LinphoneService extends Service {
 		dumpInstalledLinphoneInformation();
 
 		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-		mNM.cancel(INCALL_NOTIF_ID); // in case of crash the icon is not removed
+		//mNM.cancel(INCALL_NOTIF_ID); // in case of crash the icon is not removed
 
+		/*
 		Intent notifIntent = new Intent(this, incomingReceivedActivity);
 		notifIntent.putExtra("Notification", true);
 		mNotifContentIntent = PendingIntent.getActivity(this, 0, notifIntent, PendingIntent.FLAG_UPDATE_CURRENT);
@@ -328,13 +340,16 @@ public final class LinphoneService extends Service {
 		Intent missedCallNotifIntent = new Intent(this, incomingReceivedActivity);
 		missedCallNotifIntent.putExtra("GoToHistory", true);
 		mMissedCallsNotifContentIntent = PendingIntent.getActivity(this, 0, missedCallNotifIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+		*/
 
+		/*
 		Bitmap bm = null;
 		try {
 			bm = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
 		} catch (Exception e) {
 		}
-		mNotif = Compatibility.createNotification(this, mNotificationTitle, "", R.drawable.linphone_notification_icon, R.mipmap.ic_launcher, bm, mNotifContentIntent, true,notifcationsPriority);
+		*/
+		//mNotif = Compatibility.createNotification(this, mNotificationTitle, "", R.drawable.linphone_notification_icon, R.mipmap.ic_launcher, bm, mNotifContentIntent, true,notifcationsPriority);
 
 		LinphoneManager.createAndStart(LinphoneService.this);
 
@@ -379,8 +394,8 @@ public final class LinphoneService extends Service {
 							}
 						}
 					}
-					Notification notif = Compatibility.createMissedCallNotification(instance, getString(R.string.missed_calls_notif_title), body, mMissedCallsNotifContentIntent);
-					notifyWrapper(MISSED_NOTIF_ID, notif);
+					//Notification notif = Compatibility.createMissedCallNotification(instance, getString(R.string.missed_calls_notif_title), body, mMissedCallsNotifContentIntent);
+					//notifyWrapper(MISSED_NOTIF_ID, notif);
 				}
 
 				if (state == State.StreamsRunning) {
@@ -441,9 +456,11 @@ public final class LinphoneService extends Service {
 
 		getContentResolver().registerContentObserver(ContactsContract.Contacts.CONTENT_URI, true, ContactsManager.getInstance());
 
+		/*
 		if (displayServiceNotification()) {
 			startForegroundCompat(NOTIF_ID, mNotif);
 		}
+		*/
 
 		if (!mTestDelayElapsed) {
 			// Only used when testing. Simulates a 5 seconds delay for launching service
@@ -495,18 +512,18 @@ public final class LinphoneService extends Service {
 
 		switch (state) {
 		case IDLE:
-			mNM.cancel(INCALL_NOTIF_ID);
+			//mNM.cancel(INCALL_NOTIF_ID);
 			return;
 		case INCALL:
-			inconId = R.drawable.topbar_call_notification;
+			//inconId = R.drawable.topbar_call_notification;
 			notificationTextId = R.string.incall_notif_active;
 			break;
 		case PAUSE:
-			inconId = R.drawable.topbar_call_notification;
+			//inconId = R.drawable.topbar_call_notification;
 			notificationTextId = R.string.incall_notif_paused;
 			break;
 		case VIDEO:
-			inconId = R.drawable.topbar_videocall_notification;
+			//inconId = R.drawable.topbar_videocall_notification;
 			notificationTextId = R.string.incall_notif_video;
 			break;
 		default:
@@ -533,9 +550,9 @@ public final class LinphoneService extends Service {
 			bm = BitmapFactory.decodeResource(getResources(), R.drawable.avatar);
 		}
 		String name = address.getDisplayName() == null ? address.getUserName() : address.getDisplayName();
-		mIncallNotif = Compatibility.createInCallNotification(getApplicationContext(), mNotificationTitle, getString(notificationTextId), inconId, bm, name, mNotifContentIntent);
+		//mIncallNotif = Compatibility.createInCallNotification(getApplicationContext(), mNotificationTitle, getString(notificationTextId), inconId, bm, name, mNotifContentIntent);
 
-		notifyWrapper(INCALL_NOTIF_ID, mIncallNotif);
+		//notifyWrapper(INCALL_NOTIF_ID, mIncallNotif);
 	}
 
 	public void refreshIncallIcon(LinphoneCall currentCall) {
@@ -561,7 +578,9 @@ public final class LinphoneService extends Service {
 		addCustomNotification(onClickIntent, iconResourceID, title, message, true);
 	}
 
+	@Deprecated
 	public void addCustomNotification(Intent onClickIntent, int iconResourceID, String title, String message, boolean isOngoingEvent) {
+		/*
 		PendingIntent notifContentIntent = PendingIntent.getActivity(this, 0, onClickIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
 		Bitmap bm = null;
@@ -576,14 +595,20 @@ public final class LinphoneService extends Service {
 		mCustomNotif.defaults |= Notification.DEFAULT_LIGHTS;
 
 		notifyWrapper(CUSTOM_NOTIF_ID, mCustomNotif);
+		*/
 	}
 
+	@Deprecated
 	public void removeCustomNotification() {
+		/*
 		mNM.cancel(CUSTOM_NOTIF_ID);
 		resetIntentLaunchedOnNotificationClick();
+		*/
 	}
 
+	@Deprecated
 	public void displayMessageNotification(String fromSipUri, String fromName, String message) {
+		/*
 		Intent notifIntent = new Intent(this, LinphoneActivity.class);
 		notifIntent.putExtra("GoToChat", true);
 		notifIntent.putExtra("ChatContactSipUri", fromSipUri);
@@ -592,12 +617,6 @@ public final class LinphoneService extends Service {
 
 		if (fromName == null) {
 			fromName = fromSipUri;
-		}
-
-		if (mMsgNotif == null) {
-			mMsgNotifCount = 1;
-		} else {
-			mMsgNotifCount++;
 		}
 
 		Uri pictureUri = null;
@@ -619,24 +638,18 @@ public final class LinphoneService extends Service {
 		} else {
 			bm = BitmapFactory.decodeResource(getResources(), R.drawable.topbar_avatar);
 		}
-		mMsgNotif = Compatibility.createMessageNotification(getApplicationContext(), mMsgNotifCount, fromName, message, bm, notifContentIntent);
+		//mMsgNotif = Compatibility.createMessageNotification(getApplicationContext(), mMsgNotifCount, fromName, message, bm, notifContentIntent);
 
-		notifyWrapper(MESSAGE_NOTIF_ID, mMsgNotif);
+		//notifyWrapper(MESSAGE_NOTIF_ID, mMsgNotif);
+		*/
 	}
 
-	public void displayInappNotification(String message) {
-		Intent notifIntent = new Intent(this, LinphoneActivity.class);
-		notifIntent.putExtra("GoToInapp", true);
-
-		PendingIntent notifContentIntent = PendingIntent.getActivity(this, 0, notifIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-		mNotif = Compatibility.createSimpleNotification(getApplicationContext(), getString(R.string.inapp_notification_title), message, notifContentIntent);
-
-		notifyWrapper(NOTIF_ID, mNotif);
-	}
-
+	@Deprecated
 	public void removeMessageNotification() {
+		/*
 		mNM.cancel(MESSAGE_NOTIF_ID);
 		resetIntentLaunchedOnNotificationClick();
+		*/
 	}
 
 	private static final Class<?>[] mSetFgSign = new Class[] {boolean.class};
@@ -651,7 +664,8 @@ public final class LinphoneService extends Service {
 	private Object[] mStartForegroundArgs = new Object[2];
 	private Object[] mStopForegroundArgs = new Object[1];
 	private String incomingReceivedActivityName;
-	private Class<? extends Activity> incomingReceivedActivity = LinphoneActivity.class;
+	//TODO: Change from LinphoneActivity to CallActivity
+	private Class<? extends Activity> incomingReceivedActivity = CallActivity.class;
 
 	void invokeMethod(Method method, Object[] args) {
 		try {
@@ -741,7 +755,9 @@ public final class LinphoneService extends Service {
 		mDisableRegistrationStatus = true;
 	}
 
+	@Deprecated
 	private synchronized void sendNotification(int level, int textId) {
+		/*
 		String text = getString(textId);
 		if (text.contains("%s") && LinphoneManager.getLc() != null) {
 			// Test for null lc is to avoid a NPE when Android mess up badly with the String resources.
@@ -757,6 +773,7 @@ public final class LinphoneService extends Service {
 		}
 		mNotif = Compatibility.createNotification(this, mNotificationTitle, text, R.drawable.status_level, 0, bm, mNotifContentIntent, true,notifcationsPriority);
 		notifyWrapper(NOTIF_ID, mNotif);
+		*/
 	}
 
 	/**
@@ -812,9 +829,11 @@ public final class LinphoneService extends Service {
 		LinphoneManager.destroy();
 
 	    // Make sure our notification is gone.
+		/*
 	    stopForegroundCompat(NOTIF_ID);
 	    mNM.cancel(INCALL_NOTIF_ID);
 	    mNM.cancel(MESSAGE_NOTIF_ID);
+	    */
 
 		super.onDestroy();
 	}
@@ -831,9 +850,12 @@ public final class LinphoneService extends Service {
 		resetIntentLaunchedOnNotificationClick();
 	}
 
+	@Deprecated
 	private void resetIntentLaunchedOnNotificationClick() {
+		/*
 		Intent notifIntent = new Intent(this, incomingReceivedActivity);
 		mNotifContentIntent = PendingIntent.getActivity(this, 0, notifIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+		*/
 
 		/*if (mNotif != null) {
 			mNotif.contentIntent = mNotifContentIntent;
@@ -853,7 +875,8 @@ public final class LinphoneService extends Service {
 	{
 		if (key.equals(EXTRA_CALL_INFO))
 			return this.callInfo;
-		return null;
+		else
+			return LinphoneManager.getLc().getCurrentCall();
 	}
 
 	public void tryingNewOutgoingCallButAlreadyInCall() {

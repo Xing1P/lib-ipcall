@@ -5,7 +5,7 @@ import android.util.AttributeSet;
 import android.widget.FrameLayout;
 
 /**
- * Created by tamdoan on 19/04/2017.
+ * Created by Genius Doan on 19/04/2017.
  */
 
 public class InCallControls extends FrameLayout {

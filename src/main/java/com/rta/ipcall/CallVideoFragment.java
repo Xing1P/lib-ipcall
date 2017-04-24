@@ -42,6 +42,8 @@ import android.widget.RelativeLayout;
 /**
  * @author Sylvain Berfini
  */
+
+@Deprecated
 public class CallVideoFragment extends Fragment implements OnGestureListener, OnDoubleTapListener, CompatibilityScaleGestureListener {
 	private SurfaceView mVideoView;
 	private SurfaceView mCaptureView;

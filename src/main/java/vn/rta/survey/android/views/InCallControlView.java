@@ -10,7 +10,9 @@ import android.graphics.PixelFormat;
 import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -194,7 +196,6 @@ public class InCallControlView {
         RTALog.dWithRec(TAG, "x: " + metrics.widthPixels / 5 + " y = " + metrics.heightPixels / 4);
 
         inflater = (LayoutInflater) mService.getSystemService(Service.LAYOUT_INFLATER_SERVICE);
-        //TODO: Genius
         mView = inflater.inflate(R.layout.sip_incall, null);
         inMainView = mView;
         initMainControls();
@@ -305,7 +306,7 @@ public class InCallControlView {
 
         }
         if (elapsedTime == null)
-            elapsedTime = (Chronometer) mView.findViewById(com.csipsimple.R.id.elapsedTime);
+            elapsedTime = (Chronometer) mView.findViewById(R.id.elapsedTime);
 
     }
 
@@ -517,7 +518,6 @@ public class InCallControlView {
     }
 
     public View getView() {
-        mView.setVisibility(View.VISIBLE);
         return mView;
     }
 
@@ -541,21 +541,16 @@ public class InCallControlView {
             mView.setVisibility(View.GONE);
             return;
         }
-        updateElapsedTimer();
 
         LinphoneCall.State state = currentCall.getState();
 
         switch (state.toString()) {
-            case "IncomingReceived":
+            case "IncomingEarlyMedia":
                 mView.setVisibility(View.GONE);
                 break;
 
             case "StreamsRunning":
             case "Updating":
-                mView.setVisibility(View.VISIBLE);
-                setEnabledMediaButtons(true);
-                break;
-
             case "Connected":
                 mView.setVisibility(View.VISIBLE);
                 setEnabledMediaButtons(true);
@@ -581,7 +576,6 @@ public class InCallControlView {
         }
 
         updateElapsedTimer();
-
     }
 
     /**
@@ -653,7 +647,7 @@ public class InCallControlView {
     }
 
     public void setOnDtmfListener(OnDtmfListener onDtmfListener, LinphoneCall call) {
-        this.callID = callID;
+        currentCall = call;
         this.onDtmfListener = onDtmfListener;
     }
 
@@ -663,14 +657,11 @@ public class InCallControlView {
     }
 
     public void updateElapsedTimer() {
-
         if (currentCall == null) {
             elapsedTime.stop();
             elapsedTime.setVisibility(View.VISIBLE);
             return;
         }
-
-        elapsedTime.setBase(0);
 
         LinphoneCall.State state = currentCall.getState();
         switch (state.toString()) {
@@ -681,9 +672,6 @@ public class InCallControlView {
             case "OutgoingProgress":
             case "OutgoingRinging":
             case "OutgoingEarlyMedia":
-            case "StreamsRunning":
-            case "Resuming":
-            case "Updating":
                 elapsedTime.setVisibility(View.GONE);
                 break;
             case "Connected":
@@ -694,6 +682,7 @@ public class InCallControlView {
                 } else {
                     elapsedTime.start();
                     elapsedTime.setVisibility(View.VISIBLE);
+                    elapsedTime.setBase(SystemClock.elapsedRealtime());
                 }
                 updateView();
                 endCallView.setVisibility(View.VISIBLE);

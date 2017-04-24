@@ -2,6 +2,7 @@ package vn.rta.survey.android.widgets;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
@@ -24,6 +25,7 @@ import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.javarosa.xpath.expr.XPathFuncExpr;
+import org.linphone.core.LinphoneAddress;
 import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.external.ExternalDataUtil;
@@ -162,11 +164,11 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
 
         // Put the question text on the left half of the screen
         LinearLayout.LayoutParams labelParams =
-                new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         labelParams.weight = 0.6f;
 
         LinearLayout.LayoutParams imageParams =
-                new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         if (isShowQuestionText)
             imageParams.weight = 0.4f;
 //        else imageParams.weight = 0.5f;
@@ -204,7 +206,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         }
 
         LinearLayout.LayoutParams playimageParams =
-                new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         if (isShowQuestionText)
             playimageParams.weight = 0.1f;
         else playimageParams.weight = 0.5f;
@@ -300,7 +302,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
     }
 
     @Override
-    public void setOnLongClickListener(View.OnLongClickListener l) {
+    public void setOnLongClickListener(OnLongClickListener l) {
         if (mCaptureButton != null)
             mCaptureButton.setOnLongClickListener(l);
     }

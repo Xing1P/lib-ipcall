@@ -2,10 +2,8 @@ package vn.rta.ipcall.ui;
 
 import org.linphone.core.LinphoneCall;
 
-import vn.rta.ipcall.api.SipCallSession;
-
 /**
- * Created by tamdoan on 19/04/2017.
+ * Created by Genius Doan on 19/04/2017.
  */
 
 public interface IOnCallActionTrigger {

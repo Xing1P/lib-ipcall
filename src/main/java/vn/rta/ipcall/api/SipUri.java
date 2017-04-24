@@ -1,9 +1,5 @@
 package vn.rta.ipcall.api;
 
-/**
- * Created by tamdoan on 18/04/2017.
- */
-
 import android.net.Uri;
 import android.text.TextUtils;
 
@@ -11,9 +7,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
+ * Created by Genius Doan on 18/04/2017.
  * Helper class for Sip uri manipulation in java space.
  * Allows to parse sip uris and check it.
- *
  */
 public final class SipUri {
 

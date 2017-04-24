@@ -24,6 +24,8 @@ import com.rta.ipcall.ui.AddressText;
 import org.javarosa.core.model.FormIndex;
 import org.linphone.core.LinphoneAddress;
 import org.linphone.core.LinphoneCall;
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCoreListenerBase;
 import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.logic.FormController;
 
@@ -36,6 +38,7 @@ import vn.rta.survey.android.application.RTASurvey;
 import vn.rta.survey.android.entities.SIPProfile;
 import vn.rta.survey.android.listeners.SaveCurrentAnswerListnener;
 import vn.rta.survey.android.listeners.SipCallUpdateUIListener;
+import vn.rta.survey.android.services.InIpCallService;
 
 /**
  * Created by Genius Doan on 18/04/2017.
@@ -59,6 +62,7 @@ public class IPCallManager {
     private boolean globGsm = true;
     private SIPProfile sipProfile;
     LinphoneManager.AddressType recipient;
+    private LinphoneCoreListenerBase mListener;
 
     private SipCallUpdateUIListener listener;
     private SaveCurrentAnswerListnener saveListener;
@@ -72,7 +76,16 @@ public class IPCallManager {
 
     private IPCallManager()
     {
-
+        mListener = new LinphoneCoreListenerBase() {
+            //Control overall services
+            @Override
+            public void callState(LinphoneCore lc, final LinphoneCall call, LinphoneCall.State state, String message) {
+                if (LinphoneManager.getLc().getCallsNb() == 0) {
+                    mEntryActivity.stopService(new Intent(mEntryActivity, InIpCallService.class));
+                    return;
+                }
+            }
+        };
     }
 
     public void setFormEntryActivity(FormEntryActivity activity) {
@@ -143,13 +156,12 @@ public class IPCallManager {
         }
     }
 
+    @Deprecated
     private void startSipService() {
         Thread t = new Thread("StartSip") {
             public void run() {
-                Intent serviceIntent = new Intent(SipManager.INTENT_SIP_SERVICE);
-                serviceIntent.setPackage(mEntryActivity.getPackageName());
-                serviceIntent.putExtra(SipManager.EXTRA_OUTGOING_ACTIVITY, new ComponentName(mEntryActivity, FormEntryActivity.class));
-                mEntryActivity.startService(serviceIntent);
+                //We do not start sip service in here because we already start when open the apps
+                //For support receiving call.
             }
         };
         t.start();
@@ -182,7 +194,6 @@ public class IPCallManager {
         saveListener.onSaverCurrentAnswerForCall();
         formController.setSipCallIndexs(index);
         //mCaptureButton.setText("Registering...");
-        //TODO: GEnius
         saveAccount();
         updateWidget();
 
@@ -297,7 +308,6 @@ public class IPCallManager {
     }
 
     public void updateWidget() {
-        //TODO: Genius
         String numberToCall = sipProfile.getPhoneNumber();
         numberToCall = formatNumber(numberToCall);
         recipient = new AddressText(mEntryActivity, null);
@@ -322,6 +332,7 @@ public class IPCallManager {
                     }
                 }
 
+                //Start InIpCallService
                 Intent callHandlerIntent = service.buildCallUiIntent(mEntryActivity, linphoneCall, mEntryActivity.getPackageName(), SipManager.ACTION_SIP_CALL_FLOATING_UI);
                 mEntryActivity.startService(callHandlerIntent);
             } catch (Exception e) {
@@ -395,10 +406,6 @@ public class IPCallManager {
     public void stopService() {
         if (connection != null && mEntryActivity != null && isRunning && LinphoneService.isReady()) {
             mEntryActivity.unbindService(connection);
-            Intent serviceIntent = new Intent(SipManager.INTENT_SIP_SERVICE);
-            serviceIntent.setPackage(mEntryActivity.getPackageName());
-            serviceIntent.putExtra(SipManager.EXTRA_OUTGOING_ACTIVITY, new ComponentName(mEntryActivity, FormEntryActivity.class));
-            mEntryActivity.stopService(serviceIntent);
             mEntryActivity.stopService(new Intent(mEntryActivity, LinphoneService.class));
             isRunning = false;
             service = null;

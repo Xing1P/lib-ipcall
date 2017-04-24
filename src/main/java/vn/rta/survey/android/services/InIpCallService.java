@@ -26,14 +26,14 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Toast;
 
-import com.csipsimple.utils.PreferencesProviderWrapper;
-import com.csipsimple.utils.keyguard.KeyguardWrapper;
 import com.rta.ipcall.LinphoneManager;
 import com.rta.ipcall.LinphoneService;
 import com.rta.ipcall.LinphoneUtils;
 import com.rta.ipcall.ui.InCallControls;
 
 import org.linphone.core.LinphoneCall;
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCoreListenerBase;
 import org.linphone.core.Reason;
 import org.odk.collect.android.activities.FormEntryActivity;
 
@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 
-import vn.rta.ipcall.api.SipConfigManager;
 import vn.rta.ipcall.api.SipManager;
 import vn.rta.ipcall.ui.IOnCallActionTrigger;
 import vn.rta.survey.android.R;
@@ -54,10 +53,12 @@ import vn.rta.survey.android.views.InCallControlView;
 
 /**
  * Created by ThiNguyen on 8/29/16.
+ *
+ * @modified by Genius Doan on 4/20/17
  */
 
 public class InIpCallService extends Service implements InCallControlView.ChangeViewListener, IOnCallActionTrigger, InCallControlView.OnDtmfListener {
-    //TODO: Add Call Proximity Manager Genius
+    //TODO: Add Call Proximity Manager
     public static final String ACTION = "vn.rta.sipcall.service";
     public static final String ACTION_PHONE_STATE = "android.intent.action.PHONE_STATE";
     private View mView;
@@ -98,7 +99,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
     private DialingFeedback dialFeedback;
     private PowerManager powerManager;
-    private PreferencesProviderWrapper prefsWrapper;
+    //private PreferencesProviderWrapper prefsWrapper;
 
     // Dnd views
     //private ImageView endCallTarget, holdTarget, answerTarget, xferTarget;
@@ -106,9 +107,9 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
 
     private SurfaceView cameraPreview;
-    private KeyguardWrapper keyguardManager;
     private String result = "";
     private boolean isPressEndCall = false;
+    private LinphoneCoreListenerBase mListener;
 
     /**
      * Service binding
@@ -122,7 +123,35 @@ public class InIpCallService extends Service implements InCallControlView.Change
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.e("Genius", "InIPCallService created");
+        mListener = new LinphoneCoreListenerBase() {
+            //Linphone Core Listener control the UI when already in a call
+            @Override
+            public void callState(LinphoneCore lc, final LinphoneCall call, LinphoneCall.State state, String message) {
+                if (state == LinphoneCall.State.IncomingReceived) {
+                    Toast.makeText(InIpCallService.this, "Some people is calling you!", Toast.LENGTH_SHORT).show();
+                    return;
+                } else if (state == LinphoneCall.State.Connected)
+                {
+                    incallView.setCallState(call);
+                }
+                else if (state == LinphoneCall.State.Paused || state == LinphoneCall.State.PausedByRemote || state == LinphoneCall.State.Pausing) {
+                    ///TODO: Change UI when pause the call
+                } else if (state == LinphoneCall.State.Resuming) {
+                    ///TODO: Change UI when resume the call
+                } else if (state == LinphoneCall.State.StreamsRunning) {
+                    //TODO: Change UI when The call are on going after connected (after user pick the phone)
+                } else if (state == LinphoneCall.State.CallEnd || state == LinphoneCall.State.Error || state == LinphoneCall.State.CallReleased) {
+                    //TODO: Close
+                    if (service == null && !LinphoneService.isReady())
+                        return;
+
+                    if (call != null) {
+                        currentCall = call;
+                        incallView.setCallState(call);
+                    }
+                }
+            }
+        };
 //        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
 //            Toast.makeText(this, R.string.cpms_drawing_over_other_app_request, Toast.LENGTH_LONG).show();
 //            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -166,7 +195,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
             startActivity(i);
             return START_NOT_STICKY;
         } else {
-            Log.e("Genius", "InIPCallService onStartCommand");
             wm = (WindowManager) getSystemService(WINDOW_SERVICE);
             if (mView == null) {
                 incallView = new InCallControlView(this, wm, getApplicationContext());
@@ -176,19 +204,19 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 incallView.setOnTriggerListener(this);
                 mView.setOnTouchListener(new MyTouch());
                 wm.addView(mView, params);
+                LinphoneManager.getLc().addListener(mListener);
             }
         }
         if (serviceConnected)
             return START_NOT_STICKY;
         if (intent != null) {
             connection = new ServiceConnection() {
-
                 @Override
                 public void onServiceConnected(ComponentName arg0, IBinder arg1) {
                     service = LinphoneService.instance();
                     // Log.d(THIS_FILE,
                     // "Service started get real call info "+callInfo.getCallId());
-                    //callsInfo = service.getCalls();
+                    callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
                     serviceConnected = true;
 
                        /* if (incallView != null) {
@@ -227,7 +255,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
                                 return;
                         }
                     }
-
                 }
 
                 @Override
@@ -249,12 +276,12 @@ public class InIpCallService extends Service implements InCallControlView.Change
             incallView.setCallState(initialSession);
 
             bindService(new Intent(this, LinphoneService.class), connection, Context.BIND_AUTO_CREATE);
-            prefsWrapper = new PreferencesProviderWrapper(this);
+            //prefsWrapper = new PreferencesProviderWrapper(this);
 
             powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
             wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK
                             | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
-                    "com.csipsimple.onIncomingCall");
+                    "vn.rta.ipcall.onIncomingCall");
 
 
             dialFeedback = new DialingFeedback(this, true);
@@ -269,7 +296,8 @@ public class InIpCallService extends Service implements InCallControlView.Change
             filter.addAction(ACTION_PHONE_STATE);
             registerReceiver(callStateReceiver, filter);
 
-            useAutoDetectSpeaker = prefsWrapper.getPreferenceBooleanValue(SipConfigManager.AUTO_DETECT_SPEAKER);
+            //useAutoDetectSpeaker = prefsWrapper.getPreferenceBooleanValue(SipConfigManager.AUTO_DETECT_SPEAKER);
+            useAutoDetectSpeaker = true;
 
             wakeLock.setReferenceCounted(false);
         }
@@ -288,6 +316,8 @@ public class InIpCallService extends Service implements InCallControlView.Change
             result = result + " 0";
         mIntent.putExtra("SCAN_RESULT", result);
         LocalBroadcastManager.getInstance(RTASurvey.getInstance().getActivity()).sendBroadcast(mIntent);
+
+        LinphoneManager.getLc().removeListener(mListener);
 
         try {
             unbindService(connection);
@@ -334,7 +364,9 @@ public class InIpCallService extends Service implements InCallControlView.Change
                     boolean shouldHoldOthers = false;
 
                     // Well actually we should be always before confirmed
-                    if (callSession.getState() != LinphoneCall.State.Connected) {
+                    if (callSession.getState() == LinphoneCall.State.CallIncomingEarlyMedia
+                            || callSession.getState() == LinphoneCall.State.OutgoingEarlyMedia
+                            || callSession.getState() == LinphoneCall.State.Connected) {
                         shouldHoldOthers = true;
                     }
 
@@ -359,22 +391,15 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
                 if (LinphoneService.isReady()) {
                     LinphoneManager.getLc().declineCall(callSession, Reason.Busy);
-
-                    //service.hangup(callSession.getCallId(), SipCallSession.StatusCode.BUSY_HERE);
                 }
                 onDestroy();
                 break;
             }
-            case REJECT_CALL: {
-                if (LinphoneService.isReady()) {
-                    LinphoneManager.getLc().terminateCall(callSession);
-                    break;
-                }
-            }
+            case REJECT_CALL:
             case TERMINATE_CALL: {
                 //incallView.changeView(InCallControlView.MODE_END_CALL);
                 if (LinphoneService.isReady()) {
-                    LinphoneManager.getInstance().terminateCall();
+                    LinphoneManager.getLc().terminateCall(callSession);
                     result = result + incallView.getTimeStamp();
                     isPressEndCall = true;
                     incallView.stopElapsedTimer();
@@ -396,15 +421,19 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 break;
             }
             case SPEAKER_ON:
-                if (LinphoneService.isReady()){
+                if (LinphoneService.isReady()) {
                     useAutoDetectSpeaker = false;
                     LinphoneManager.getLc().enableSpeaker(true);
                 }
+                else
+                    Toast.makeText(getApplicationContext(), "Speaker is not working!", Toast.LENGTH_SHORT).show();
             case SPEAKER_OFF: {
                 if (LinphoneService.isReady()) {
                     useAutoDetectSpeaker = false;
                     LinphoneManager.getLc().enableSpeaker(false);
                 }
+                else
+                    Toast.makeText(getApplicationContext(), "Speaker is not working!", Toast.LENGTH_SHORT).show();
                 break;
             }
             case BLUETOOTH_ON:
@@ -455,7 +484,10 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 if (LinphoneService.isReady()) {
                     // Log.d(THIS_FILE,
                     // "Current state is : "+callInfo.getCallState().name()+" / "+callInfo.getMediaStatus().name());
-                    LinphoneManager.getInstance().pauseOrResumeCall(LinphoneManager.getLc().getCurrentCall());
+                    if (LinphoneManager.getLc().getCurrentCall() != null)
+                        LinphoneManager.getInstance().pauseOrResumeCall(LinphoneManager.getLc().getCurrentCall());
+                    else
+                        LinphoneManager.getInstance().pauseOrResumeCall(callSession);
                 }
                 break;
             }
@@ -491,14 +523,14 @@ public class InIpCallService extends Service implements InCallControlView.Change
                         public void onClick(DialogInterface dialog, int which) {
                             if (service != null) {
                                 // 1 = PJSUA_XFER_NO_REQUIRE_REPLACES\
-                                //TODO: Genius
-                                LinphoneManager.getLc().transferCall(LinphoneManager.getLc().getCurrentCall(), "01684934109");
+
+                                LinphoneManager.getLc().transferCallToAnother(LinphoneManager.getLc().getCurrentCall(), remoteCalls.get(which));
                             }
                             dialog.dismiss();
                         }
                     })
                             .setCancelable(true)
-                            .setNeutralButton(com.csipsimple.R.string.cancel, new Dialog.OnClickListener() {
+                            .setNeutralButton(R.string.cancel, new Dialog.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     dialog.dismiss();
@@ -566,7 +598,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
         //proximityManager.restartTimer();
         if (service != null) {
             if (call != null) {
-                LinphoneManager.getLc().sendDtmf((char)keyCode);
+                LinphoneManager.getLc().sendDtmf((char) keyCode);
                 dialFeedback.giveFeedback(dialTone);
             }
         }
@@ -649,7 +681,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
             if (action.equals(SipManager.ACTION_SIP_CALL_CHANGED)) {
                 if (service != null) {
                     synchronized (callMutex) {
-                        if (service == null || LinphoneService.isReady() || LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc()).isEmpty())
+                        if ((service == null && !LinphoneService.isReady()) || LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc()).isEmpty())
                             return;
                         callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
                         for (int i = 0; i < callsInfo.size(); i++) {
@@ -661,8 +693,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
                         }
                         if (currentCall != null) {
                             LinphoneCall mainCallInfo = currentCall;
-                            incallView.setCallState(mainCallInfo);
-
                             LinphoneCall.State state = mainCallInfo.getState();
 
                             //int backgroundResId = R.drawable.bg_in_call_gradient_unidentified;

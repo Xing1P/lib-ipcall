@@ -18,9 +18,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
@@ -29,7 +29,6 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.hardware.Sensor;
@@ -49,13 +48,11 @@ import android.os.Vibrator;
 import android.preference.CheckBoxPreference;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
-import android.support.v4.app.ActivityCompat;
 import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.rta.ipcall.assistant.AssistantActivity;
 import org.linphone.core.CallDirection;
 import org.linphone.core.LinphoneAccountCreator;
 import org.linphone.core.LinphoneAddress;
@@ -404,7 +401,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		}
 
 		if (state == LinphoneChatMessage.State.FileTransferError) {
-			LinphoneUtils.displayErrorAlert(getString(R.string.image_transfert_error), LinphoneActivity.instance());
+			//LinphoneUtils.displayErrorAlert(getString(R.string.image_transfert_error), LinphoneActivity.instance());
 		}
 
 		for (LinphoneChatMessage.LinphoneChatMessageListener l: simpleListeners) {
@@ -562,9 +559,8 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 			} catch (LinphoneCoreException e) {
 				return;
 			}
-		} else if (LinphoneActivity.isInstanciated()) {
-			LinphoneActivity.instance().displayCustomToast(getString(R.string.error_network_unreachable), Toast.LENGTH_LONG);
 		} else {
+			Toast.makeText(getContext(), getString(R.string.error_network_unreachable), Toast.LENGTH_LONG).show();
 			Log.e("Error: " + getString(R.string.error_network_unreachable));
 		}
 	}
@@ -927,7 +923,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		if(mLc.isInComingInvitePending() && on){
 			try {
 				mLc.acceptCall(mLc.getCurrentCall());
-				LinphoneActivity.instance().startIncallActivity(mLc.getCurrentCall());
+				//LinphoneActivity.instance().startIncallActivity(mLc.getCurrentCall());
 			}catch(LinphoneCoreException e){}
 		}else if(on && CallActivity.isInstanciated()){
 			CallActivity.instance().setSpeakerEnabled(true);
@@ -1207,7 +1203,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		final LinphoneAddress from = message.getFrom();
 		try {
 			final LinphoneContact contact = ContactsManager.getInstance().findContactFromAddress(from);
-			if (LinphoneActivity.instance().isOnBackground()) {
+
 				if (!mServiceContext.getResources().getBoolean(R.bool.disable_chat_message_notification)) {
 					if (contact != null) {
 						LinphoneService.instance().displayMessageNotification(from.asStringUriOnly(), contact.getFullName()
@@ -1217,36 +1213,6 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 								, getString(R.string.message_cant_be_decrypted_notif));
 					}
 				}
-			} else if (!mAreDisplayAlertMessage){
-				mAreDisplayAlertMessage = true;
-				final Dialog dialog = LinphoneActivity.instance().displayDialog(
-						getString(R.string.message_cant_be_decrypted).replace("%s"
-								, (contact != null) ? contact.getFullName() : from.getUserName()));
-				Button delete = (Button) dialog.findViewById(R.id.delete_button);
-				delete.setText(getString(R.string.call));
-				Button cancel = (Button) dialog.findViewById(R.id.cancel);
-				cancel.setText(getString(R.string.ok));
-
-				delete.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View view) {
-						LinphoneManager.getInstance().newOutgoingCall(from.asStringUriOnly()
-								, (contact != null) ? contact.getFullName() : from.getUserName());
-						dialog.dismiss();
-						LinphoneManager.getInstance().setAreDisplayAlertMessage(false);
-					}
-				});
-
-				cancel.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View view) {
-						dialog.dismiss();
-						LinphoneManager.getInstance().setAreDisplayAlertMessage(false);
-					}
-				});
-				if(LinphoneManager.getLc().getLimeEncryption() == LinphoneCore.LinphoneLimeState.Mandatory)
-					dialog.show();
-			}
 		} catch (Exception e) {
 			Log.e(e);
 		}
@@ -1314,13 +1280,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 
 	public Context getContext() {
 		try {
-			if (LinphoneActivity.isInstanciated())
-				return LinphoneActivity.instance();
-			else if (CallActivity.isInstanciated())
-				return CallActivity.instance();
-			else if (CallIncomingActivity.isInstanciated())
-				return CallIncomingActivity.instance();
-			else if (mServiceContext != null)
+			if (mServiceContext != null)
 				return mServiceContext;
 			else if (LinphoneService.isReady())
 				return LinphoneService.instance().getApplicationContext();
@@ -1732,7 +1692,9 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		}
 	}
 
+	@Deprecated
 	private void askLinkWithPhoneNumber(){
+		/*
 		long now = new Timestamp(new Date().getTime()).getTime();
 		long future = new Timestamp(LinphoneActivity.instance().getResources().getInteger(R.integer.popup_time_interval)).getTime();
 		long newDate = now + future;
@@ -1766,6 +1728,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 			}
 		});
 		dialog.show();
+		*/
 	}
 
 	public void setDozeModeEnabled(boolean b) {

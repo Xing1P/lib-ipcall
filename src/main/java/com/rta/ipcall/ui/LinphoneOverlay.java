@@ -1,6 +1,6 @@
 package com.rta.ipcall.ui;
 
-import com.rta.ipcall.LinphoneActivity;
+import com.rta.ipcall.CallActivity;
 import com.rta.ipcall.LinphoneManager;
 import com.rta.ipcall.LinphoneService;
 import org.linphone.core.LinphoneCall;
@@ -68,7 +68,8 @@ public class LinphoneOverlay extends org.linphone.mediastream.video.display.GL2J
 			@Override
 			public void onClick(View v) {
 				Context context = LinphoneService.instance();
-				Intent intent = new Intent(context, LinphoneActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				//Intent intent = new Intent(context, LinphoneActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				Intent intent = new Intent(context, CallActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				context.startActivity(intent);
 			}
 		});

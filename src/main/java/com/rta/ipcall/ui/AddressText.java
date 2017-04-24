@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package com.rta.ipcall.ui;
 
-import com.rta.ipcall.DialerFragment;
 import com.rta.ipcall.LinphoneManager.AddressType;
 import com.rta.ipcall.R;
 
@@ -38,7 +37,6 @@ public class AddressText extends EditText implements AddressType {
 	private String displayedName;
 	private Uri pictureUri;
 	private Paint mTestPaint;
-	private DialerFragment dialer;
 	
 	public void setPictureUri(Uri uri) {
 		pictureUri = uri;
@@ -87,10 +85,6 @@ public class AddressText extends EditText implements AddressType {
 		pictureUri = null;
 
 		refitText(getWidth(), getHeight());
-		
-		if (dialer != null) {
-			dialer.enableDisableAddContact();
-		}
 
 		super.onTextChanged(text, start, before, after);
 	}
@@ -144,9 +138,5 @@ public class AddressText extends EditText implements AddressType {
 		
 		refitText(parentWidth, height);
 		setMeasuredDimension(parentWidth, height);
-	}
-
-	public void setDialerFragment(DialerFragment dialerFragment) {
-		dialer = dialerFragment;
 	}
 }
