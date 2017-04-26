@@ -1,7 +1,7 @@
 package com.rta.ipcall.compatibility;
 
-import android.widget.TextView;
 import android.annotation.TargetApi;
+import android.widget.TextView;
 
 /*
 ApiTwentyThreePlus.java

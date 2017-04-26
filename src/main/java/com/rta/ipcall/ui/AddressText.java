@@ -18,15 +18,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package com.rta.ipcall.ui;
 
-import com.rta.ipcall.LinphoneManager.AddressType;
-import com.rta.ipcall.R;
-
 import android.content.Context;
 import android.graphics.Paint;
 import android.net.Uri;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.widget.EditText;
+
+import com.rta.ipcall.LinphoneManager.AddressType;
+import com.rta.ipcall.R;
 
 /**
  * @author Guillaume Beraudo

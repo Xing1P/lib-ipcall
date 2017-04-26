@@ -18,11 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall.ui;
 
-import java.util.ArrayList;
-import java.util.Collection;
-
-import com.rta.ipcall.R;
-
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
@@ -30,6 +25,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+
+import com.rta.ipcall.R;
+
+import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * @author Guillaume Beraudo

@@ -1,9 +1,5 @@
 package com.rta.ipcall.compatibility;
 
-import java.util.ArrayList;
-
-import com.rta.ipcall.R;
-
 import android.annotation.TargetApi;
 import android.app.AlarmManager;
 import android.app.Notification;
@@ -19,6 +15,10 @@ import android.provider.ContactsContract.CommonDataKinds.SipAddress;
 import android.provider.ContactsContract.Contacts;
 import android.provider.ContactsContract.Intents.Insert;
 import android.widget.TextView;
+
+import com.rta.ipcall.R;
+
+import java.util.ArrayList;
 
 /*
 ApiElevenPlus.java

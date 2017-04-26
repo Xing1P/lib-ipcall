@@ -2,7 +2,6 @@ package vn.rta.survey.android.widgets;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
@@ -25,7 +24,6 @@ import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.javarosa.xpath.expr.XPathFuncExpr;
-import org.linphone.core.LinphoneAddress;
 import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.external.ExternalDataUtil;
@@ -130,8 +128,9 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
             IPCallManager.getInstance().connectToServer();
         }
 
-        if (IPCallManager.getInstance().isRunning()){
+        if (IPCallManager.getInstance().isRunning() && LinphoneService.isReady()){
             updateCallButton(true);
+            //TODO: Check here: call before service created so linphone manager is not instantiated
             LinphoneManager.getInstance().setAlreadyAcceptedOrDeniedCall(false);
         }
     }

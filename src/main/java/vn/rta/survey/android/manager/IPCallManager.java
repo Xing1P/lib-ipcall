@@ -113,6 +113,7 @@ public class IPCallManager {
             return;
 
         Intent serviceIntent = new Intent(Intent.ACTION_MAIN);
+        serviceIntent.setClass(mEntryActivity, LinphoneService.class);
 
         /*
         if (!SipConfigManager.getPreferenceBooleanValue(mEntryActivity, PreferencesWrapper.HAS_ALREADY_SETUP, false)) {

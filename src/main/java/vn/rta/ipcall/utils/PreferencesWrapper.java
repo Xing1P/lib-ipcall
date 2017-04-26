@@ -10,7 +10,6 @@ import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.util.Log;
 
-
 import org.json.JSONException;
 import org.json.JSONObject;
 

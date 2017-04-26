@@ -1,12 +1,5 @@
 package com.rta.ipcall.ui;
 
-import com.rta.ipcall.CallActivity;
-import com.rta.ipcall.LinphoneManager;
-import com.rta.ipcall.LinphoneService;
-import org.linphone.core.LinphoneCall;
-import org.linphone.core.LinphoneCallParams;
-import org.linphone.mediastream.video.AndroidVideoWindowImpl;
-
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
@@ -17,6 +10,14 @@ import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
+
+import com.rta.ipcall.CallActivity;
+import com.rta.ipcall.LinphoneManager;
+import com.rta.ipcall.LinphoneService;
+
+import org.linphone.core.LinphoneCall;
+import org.linphone.core.LinphoneCallParams;
+import org.linphone.mediastream.video.AndroidVideoWindowImpl;
 
 public class LinphoneOverlay extends org.linphone.mediastream.video.display.GL2JNIView {
 	private WindowManager wm;

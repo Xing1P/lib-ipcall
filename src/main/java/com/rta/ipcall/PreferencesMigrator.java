@@ -19,18 +19,19 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-import com.rta.ipcall.LinphonePreferences.AccountBuilder;
-import org.linphone.core.LinphoneCore;
-import org.linphone.core.LinphoneCoreException;
-import org.linphone.core.LinphoneProxyConfig;
-import org.linphone.core.LpConfig;
-import org.linphone.mediastream.Log;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.res.Resources;
 import android.preference.PreferenceManager;
+
+import com.rta.ipcall.LinphonePreferences.AccountBuilder;
+
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCoreException;
+import org.linphone.core.LinphoneProxyConfig;
+import org.linphone.core.LpConfig;
+import org.linphone.mediastream.Log;
 
 /**
  * @author Sylvain Berfini

@@ -20,9 +20,7 @@ package com.rta.ipcall;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -49,8 +47,6 @@ import android.preference.CheckBoxPreference;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.telephony.TelephonyManager;
-import android.view.View;
-import android.widget.Button;
 import android.widget.Toast;
 
 import org.linphone.core.CallDirection;

@@ -19,12 +19,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
+import android.Manifest;
+import android.content.Context;
+import android.content.pm.PackageManager;
 
 import org.linphone.core.LinphoneAddress;
 import org.linphone.core.LinphoneAddress.TransportType;
@@ -42,9 +39,11 @@ import org.linphone.core.LpConfig;
 import org.linphone.core.TunnelConfig;
 import org.linphone.mediastream.Log;
 
-import android.Manifest;
-import android.content.Context;
-import android.content.pm.PackageManager;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 
 /**
  * @author Sylvain Berfini

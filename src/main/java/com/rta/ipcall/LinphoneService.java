@@ -18,28 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Map;
-
-import com.rta.ipcall.compatibility.Compatibility;
-import org.linphone.core.LinphoneAddress;
-import org.linphone.core.LinphoneCall;
-import org.linphone.core.LinphoneCall.State;
-import org.linphone.core.LinphoneCallLog.CallStatus;
-import org.linphone.core.LinphoneCore;
-import org.linphone.core.LinphoneCore.GlobalState;
-import org.linphone.core.LinphoneCore.RegistrationState;
-import org.linphone.core.LinphoneCoreException;
-import org.linphone.core.LinphoneCoreFactory;
-import org.linphone.core.LinphoneCoreFactoryImpl;
-import org.linphone.core.LinphoneCoreListenerBase;
-import org.linphone.core.LinphoneProxyConfig;
-import org.linphone.mediastream.Log;
-import org.linphone.mediastream.Version;
-import com.rta.ipcall.ui.LinphoneOverlay;
-
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlarmManager;
@@ -62,8 +40,28 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
-import android.text.TextUtils;
 import android.view.WindowManager;
+
+import com.rta.ipcall.compatibility.Compatibility;
+import com.rta.ipcall.ui.LinphoneOverlay;
+
+import org.linphone.core.LinphoneAddress;
+import org.linphone.core.LinphoneCall;
+import org.linphone.core.LinphoneCall.State;
+import org.linphone.core.LinphoneCallLog.CallStatus;
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCore.GlobalState;
+import org.linphone.core.LinphoneCore.RegistrationState;
+import org.linphone.core.LinphoneCoreFactory;
+import org.linphone.core.LinphoneCoreFactoryImpl;
+import org.linphone.core.LinphoneCoreListenerBase;
+import org.linphone.core.LinphoneProxyConfig;
+import org.linphone.mediastream.Log;
+import org.linphone.mediastream.Version;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 
 /**
  *
@@ -874,9 +872,13 @@ public final class LinphoneService extends Service {
 	public LinphoneCall getExtraValue(String key)
 	{
 		if (key.equals(EXTRA_CALL_INFO))
-			return this.callInfo;
-		else
-			return LinphoneManager.getLc().getCurrentCall();
+		{
+			if (this.callInfo != null)
+				return this.callInfo;
+			else
+				return LinphoneManager.getLc().getCurrentCall();
+		}
+		return null;
 	}
 
 	public void tryingNewOutgoingCallButAlreadyInCall() {

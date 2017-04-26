@@ -18,15 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall.ui;
 
-import com.rta.ipcall.CallActivity;
-import com.rta.ipcall.LinphoneManager;
-import com.rta.ipcall.LinphonePreferences;
-import com.rta.ipcall.LinphoneService;
-import com.rta.ipcall.R;
-import org.linphone.core.LinphoneCore;
-import org.linphone.core.LinphoneCoreFactory;
-import org.linphone.mediastream.Log;
-
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -35,6 +26,16 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
+
+import com.rta.ipcall.CallActivity;
+import com.rta.ipcall.LinphoneManager;
+import com.rta.ipcall.LinphonePreferences;
+import com.rta.ipcall.LinphoneService;
+import com.rta.ipcall.R;
+
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCoreFactory;
+import org.linphone.mediastream.Log;
 
 public class Digit extends Button implements AddressAware {
 

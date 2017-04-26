@@ -17,13 +17,6 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-import com.rta.ipcall.compatibility.Compatibility;
-import com.rta.ipcall.compatibility.CompatibilityScaleGestureDetector;
-import com.rta.ipcall.compatibility.CompatibilityScaleGestureListener;
-import org.linphone.core.LinphoneCall;
-import org.linphone.mediastream.Log;
-import org.linphone.mediastream.video.AndroidVideoWindowImpl;
-import org.linphone.mediastream.video.capture.hwconf.AndroidCameraConfiguration;
 
 import android.app.Fragment;
 import android.os.Bundle;
@@ -38,6 +31,15 @@ import android.view.View;
 import android.view.View.OnTouchListener;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
+
+import com.rta.ipcall.compatibility.Compatibility;
+import com.rta.ipcall.compatibility.CompatibilityScaleGestureDetector;
+import com.rta.ipcall.compatibility.CompatibilityScaleGestureListener;
+
+import org.linphone.core.LinphoneCall;
+import org.linphone.mediastream.Log;
+import org.linphone.mediastream.video.AndroidVideoWindowImpl;
+import org.linphone.mediastream.video.capture.hwconf.AndroidCameraConfiguration;
 
 /**
  * @author Sylvain Berfini

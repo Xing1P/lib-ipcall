@@ -18,20 +18,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package com.rta.ipcall.ui;
 
-import com.rta.ipcall.LinphoneManager;
-import com.rta.ipcall.LinphonePreferences;
-import com.rta.ipcall.R;
-import org.linphone.core.CallDirection;
-import org.linphone.core.LinphoneCallLog;
-import org.linphone.core.LinphoneCoreException;
-import org.linphone.core.LinphoneProxyConfig;
-
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ImageView;
 import android.widget.Toast;
+
+import com.rta.ipcall.LinphoneManager;
+import com.rta.ipcall.LinphonePreferences;
+import com.rta.ipcall.R;
+
+import org.linphone.core.CallDirection;
+import org.linphone.core.LinphoneCallLog;
+import org.linphone.core.LinphoneCoreException;
+import org.linphone.core.LinphoneProxyConfig;
 
 /**
  * @author Guillaume Beraudo

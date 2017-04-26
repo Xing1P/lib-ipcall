@@ -18,7 +18,6 @@ import android.provider.Settings;
 import android.support.v4.content.LocalBroadcastManager;
 import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.View;
@@ -94,7 +93,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
     // True if running unit tests
     // private boolean inTest;
-    private boolean useAutoDetectSpeaker = false;
 
 
     private DialingFeedback dialFeedback;
@@ -296,9 +294,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
             filter.addAction(ACTION_PHONE_STATE);
             registerReceiver(callStateReceiver, filter);
 
-            //useAutoDetectSpeaker = prefsWrapper.getPreferenceBooleanValue(SipConfigManager.AUTO_DETECT_SPEAKER);
-            useAutoDetectSpeaker = true;
-
             wakeLock.setReferenceCounted(false);
         }
 
@@ -420,16 +415,17 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 }
                 break;
             }
-            case SPEAKER_ON:
+            case SPEAKER_ON: {
                 if (LinphoneService.isReady()) {
-                    useAutoDetectSpeaker = false;
+                    LinphoneManager.getInstance().routeAudioToSpeaker();
                     LinphoneManager.getLc().enableSpeaker(true);
-                }
-                else
+                } else
                     Toast.makeText(getApplicationContext(), "Speaker is not working!", Toast.LENGTH_SHORT).show();
+                break;
+            }
             case SPEAKER_OFF: {
                 if (LinphoneService.isReady()) {
-                    useAutoDetectSpeaker = false;
+                    LinphoneManager.getInstance().routeAudioToReceiver();
                     LinphoneManager.getLc().enableSpeaker(false);
                 }
                 else
@@ -480,7 +476,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 break;
             }
             case TOGGLE_HOLD: {
-
                 if (LinphoneService.isReady()) {
                     // Log.d(THIS_FILE,
                     // "Current state is : "+callInfo.getCallState().name()+" / "+callInfo.getMediaStatus().name());

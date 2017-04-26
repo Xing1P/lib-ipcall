@@ -18,17 +18,18 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall;
 
-import com.rta.ipcall.compatibility.Compatibility;
-import org.linphone.core.LinphoneCore;
-import org.linphone.core.LinphoneCoreFactory;
-import org.linphone.mediastream.Log;
-
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
+
+import com.rta.ipcall.compatibility.Compatibility;
+
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCoreFactory;
+import org.linphone.mediastream.Log;
 
 /*
  * Purpose of this receiver is to disable keep alives when screen is off

@@ -18,15 +18,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package com.rta.ipcall;
 
-import static android.content.Intent.ACTION_MAIN;
-
-import org.linphone.mediastream.Version;
-
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.Handler;
+
+import org.linphone.mediastream.Version;
+
+import static android.content.Intent.ACTION_MAIN;
 
 /**
  *

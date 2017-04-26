@@ -18,13 +18,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 package com.rta.ipcall;
 
-import org.linphone.core.LinphoneCoreFactory;
-import org.linphone.core.LpConfig;
-import org.linphone.mediastream.Log;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+
+import org.linphone.core.LinphoneCoreFactory;
+import org.linphone.core.LpConfig;
+import org.linphone.mediastream.Log;
 
 public class BootReceiver extends BroadcastReceiver {
 

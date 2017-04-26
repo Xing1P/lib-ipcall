@@ -1,7 +1,5 @@
 package com.rta.ipcall.compatibility;
 
-import com.rta.ipcall.R;
-
 import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -9,6 +7,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+
+import com.rta.ipcall.R;
 /*
 ApiSixteenPlus.java
 Copyright (C) 2012  Belledonne Communications, Grenoble, France

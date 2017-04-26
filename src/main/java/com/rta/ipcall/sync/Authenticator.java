@@ -20,7 +20,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 import android.accounts.AbstractAccountAuthenticator;
-import android.accounts.*;
+import android.accounts.Account;
+import android.accounts.AccountAuthenticatorResponse;
+import android.accounts.NetworkErrorException;
 import android.content.Context;
 import android.os.Bundle;
 

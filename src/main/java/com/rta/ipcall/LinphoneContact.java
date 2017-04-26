@@ -18,22 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 package com.rta.ipcall;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-
-import org.linphone.core.LinphoneAddress;
-import org.linphone.core.LinphoneCore;
-import org.linphone.core.LinphoneCoreException;
-import org.linphone.core.LinphoneFriend;
-import org.linphone.core.LinphoneFriendImpl;
-import org.linphone.core.LinphoneFriend.SubscribePolicy;
-import org.linphone.core.PresenceBasicStatus;
-import org.linphone.core.PresenceModel;
-import org.linphone.mediastream.Log;
-
 import android.content.ContentProviderOperation;
 import android.content.ContentResolver;
 import android.content.ContentUris;
@@ -42,6 +26,22 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds;
+
+import org.linphone.core.LinphoneAddress;
+import org.linphone.core.LinphoneCore;
+import org.linphone.core.LinphoneCoreException;
+import org.linphone.core.LinphoneFriend;
+import org.linphone.core.LinphoneFriend.SubscribePolicy;
+import org.linphone.core.LinphoneFriendImpl;
+import org.linphone.core.PresenceBasicStatus;
+import org.linphone.core.PresenceModel;
+import org.linphone.mediastream.Log;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 
 public class LinphoneContact implements Serializable, Comparable<LinphoneContact> {
 	/**
