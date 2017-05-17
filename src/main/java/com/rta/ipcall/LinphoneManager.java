@@ -47,6 +47,7 @@ import android.preference.CheckBoxPreference;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.widget.Toast;
 
 import org.linphone.core.CallDirection;
@@ -160,6 +161,10 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 	private Sensor mProximity;
 	private boolean mProximitySensingEnabled;
 	private boolean alreadyAcceptedOrDeniedCall;
+	private static boolean isAllowIncomingCall = false;
+
+	private boolean accountCreated = false;
+	private LinphoneAddress address;
 
 	public String wizardLoginViewDomain = null;
 
@@ -499,6 +504,17 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		return mLPConfigXsd;
 	}
 
+	public void setEnableMicro(boolean isEnabled) {
+		LinphoneCore lc = getLc();
+		if (isEnabled && !lc.isMicMuted())
+		{
+			lc.muteMic(true);
+		}
+		else {
+			lc.muteMic(false);
+		}
+	}
+
 	public void newOutgoingCall(AddressType address) {
 		String to = address.getText().toString();
 		newOutgoingCall(to, address.getDisplayedName());
@@ -642,7 +658,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		LinphoneManager.getLc().setVideoDevice(camId);
 	}
 
-	public static interface AddressType {
+	public interface AddressType {
 		void setText(CharSequence s);
 		CharSequence getText();
 		void setDisplayedName(String s);
@@ -650,10 +666,10 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 	}
 
 
-	public static interface NewOutgoingCallUiListener {
-		public void onWrongDestinationAddress();
-		public void onCannotGetCallParameters();
-		public void onAlreadyInCall();
+	public interface NewOutgoingCallUiListener {
+		void onWrongDestinationAddress();
+		void onCannotGetCallParameters();
+		void onAlreadyInCall();
 	}
 
 	public boolean toggleEnableCamera() {
@@ -916,6 +932,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 	}
 
 	protected void setHandsetMode(Boolean on){
+		/*
 		if(mLc.isInComingInvitePending() && on){
 			try {
 				mLc.acceptCall(mLc.getCurrentCall());
@@ -927,6 +944,7 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		}else if (!on){
 			LinphoneManager.getInstance().terminateCall();
 		}
+		*/
 	}
 
 	private void copyAssetsFromPackage() throws IOException {
@@ -1751,11 +1769,89 @@ public class LinphoneManager implements LinphoneCoreListener, LinphoneChatMessag
 		mLc.setDnsServers(servers);
 	}
 
+	public void prepareLogIn() {
+		mPrefs = LinphonePreferences.instance();
+		accountCreator = LinphoneCoreFactory.instance().createAccountCreator(LinphoneManager.getLc(), LinphonePreferences.instance().getXmlrpcUrl());
+		accountCreator.setListener(this);
+	}
+
+	public void genericLogIn(String username, String password, String prefix, String domain, LinphoneAddress.TransportType transport) {
+		if (accountCreated) {
+			retryLogin(username, password, prefix, domain, transport);
+		} else {
+			logIn(username, password, null, prefix, domain, transport, false);
+		}
+	}
+
+	public void retryLogin(String username, String password, String prefix, String domain, LinphoneAddress.TransportType transport) {
+		accountCreated = false;
+		saveCreatedAccount(username, password, null, prefix, domain, transport);
+	}
+
+	private void logIn(String username, String password, String ha1, String prefix, String domain, LinphoneAddress.TransportType transport, boolean sendEcCalibrationResult) {
+		saveCreatedAccount(username, password, ha1, prefix, domain, transport);
+	}
+
+	public void saveCreatedAccount(String username, String password, String ha1, String prefix, String domain, LinphoneAddress.TransportType transport) {
+		if (accountCreated)
+			return;
+
+		username = LinphoneUtils.getDisplayableUsernameFromAddress(username);
+		domain = LinphoneUtils.getDisplayableUsernameFromAddress(domain);
+
+		String identity = "sip:" + username + "@" + domain;
+		try {
+			address = LinphoneCoreFactory.instance().createLinphoneAddress(identity);
+		} catch (LinphoneCoreException e) {
+			org.linphone.mediastream.Log.e(e);
+		}
+
+		LinphonePreferences.AccountBuilder builder = new LinphonePreferences.AccountBuilder(LinphoneManager.getLc())
+				.setUsername(username)
+				.setDomain(domain)
+				.setHa1(ha1)
+				.setPassword(password);
+
+		if (prefix != null) {
+			builder.setPrefix(prefix);
+		}
+
+
+			String forcedProxy = "";
+			if (!TextUtils.isEmpty(forcedProxy)) {
+				builder.setProxy(forcedProxy)
+						.setOutboundProxyEnabled(true)
+						.setAvpfRRInterval(5);
+			}
+
+			if (transport != null) {
+				builder.setTransport(transport);
+			}
+
+
+		try {
+			builder.saveNewAccount();
+			accountCreated = true;
+		} catch (LinphoneCoreException e) {
+			org.linphone.mediastream.Log.e(e);
+		}
+	}
+
 	private boolean isVideoEnabled(LinphoneCall call) {
 		if(call != null){
 			return call.getCurrentParams().getVideoEnabled();
 		}
 		return false;
+	}
+
+	public static void setAllowIncomingCall(boolean allow)
+	{
+		isAllowIncomingCall = allow;
+	}
+
+	public static boolean isAllowIncomingCall()
+	{
+		return isAllowIncomingCall;
 	}
 
 	@SuppressWarnings("serial")

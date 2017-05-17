@@ -39,7 +39,7 @@ import vn.rta.survey.android.R;
 import vn.rta.survey.android.application.Constants;
 import vn.rta.survey.android.application.RTASurvey;
 import vn.rta.survey.android.entities.SIPProfile;
-import vn.rta.survey.android.listeners.SaveCurrentAnswerListnener;
+import vn.rta.survey.android.listeners.SaveCurrentAnswerListener;
 import vn.rta.survey.android.listeners.SipCallUpdateUIListener;
 import vn.rta.survey.android.manager.ActivityLogManager;
 import vn.rta.survey.android.manager.IPCallManager;
@@ -56,9 +56,8 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
     LinearLayout buttonLayout;
     private boolean isShowQuestionText;
     private FormEntryActivity mEntryActivity;
-    public static LinphoneService service;
     private SIPProfile sipProfile;
-    private SaveCurrentAnswerListnener saveCurrentAnswerListnener;
+    private SaveCurrentAnswerListener saveCurrentAnswerListener;
     private boolean locked = false;
 
     public SIPCallWidget(Context context, FormEntryPrompt prompt, boolean isRecord,
@@ -66,7 +65,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         super(context, prompt);
         ActivityLogManager.InsertActionWithWidget(Constants.ENTER_DATA_INSTANCE, Constants.WIDGET_SIP_CALL, Constants.CREATE_WIDGET, prompt.getAnswerText(), mPrompt);
         mEntryActivity = entryActivity;
-        saveCurrentAnswerListnener = (SaveCurrentAnswerListnener) context;
+        saveCurrentAnswerListener = (SaveCurrentAnswerListener) context;
         mInstanceFolder = Collect.getInstance().getFormController()
                 .getInstancePath().getParent();
         if (prompt.getAppearanceHint() != null && prompt.getAppearanceHint().contains("text-nolabel")) {
@@ -94,10 +93,11 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         if (mPrompt.isReadOnly()) {
             mCaptureButton.setVisibility(View.GONE);
         }
+
         IPCallManager.getInstance().setFormEntryActivity(mEntryActivity);
         IPCallManager.getInstance().setUpdateUIListener(this);
         IPCallManager.getInstance().setSipProfile(sipProfile);
-        IPCallManager.getInstance().setSaveListener(saveCurrentAnswerListnener);
+        IPCallManager.getInstance().setSaveListener(saveCurrentAnswerListener);
 
         mCaptureButton.setEnabled(false);
         if (ActivityCompat.checkSelfPermission(mEntryActivity,
@@ -128,7 +128,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
             IPCallManager.getInstance().connectToServer();
         }
 
-        if (IPCallManager.getInstance().isRunning() && LinphoneService.isReady()){
+        if (IPCallManager.getInstance().isRunning() && LinphoneService.isReady()) {
             updateCallButton(true);
             //TODO: Check here: call before service created so linphone manager is not instantiated
             LinphoneManager.getInstance().setAlreadyAcceptedOrDeniedCall(false);
@@ -178,7 +178,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         mCaptureButton = new AppCompatButton(contextThemeWrapper);
         mCaptureButton.setId(QuestionWidget.newUniqueId());
 
-        if (service == null)
+        if (!LinphoneService.isReady())
             mCaptureButton.setText(this.getResources().getString(R.string.call_connecting));
         else
             mCaptureButton.setText(this.getResources().getString(R.string.call));

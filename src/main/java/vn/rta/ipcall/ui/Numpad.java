@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-package com.rta.ipcall.ui;
+package vn.rta.ipcall.ui;
 
 import android.content.Context;
 import android.content.res.TypedArray;
@@ -26,13 +26,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 
-import com.rta.ipcall.R;
-
 import java.util.ArrayList;
 import java.util.Collection;
 
+import vn.rta.survey.android.R;
+
 /**
- * @author Guillaume Beraudo
+ * @author Genius Doan
  *
  */
 public class Numpad extends LinearLayout implements AddressAware {
@@ -45,7 +45,7 @@ public class Numpad extends LinearLayout implements AddressAware {
 	public Numpad(Context context, boolean playDtmf) {
 		super(context);
 		mPlayDtmf = playDtmf;
-		LayoutInflater.from(context).inflate(R.layout.numpad, this);
+		LayoutInflater.from(context).inflate(R.layout.ipcall_numpad, this);
 		setLongClickable(true);
 		onFinishInflate();
 	}
@@ -53,9 +53,9 @@ public class Numpad extends LinearLayout implements AddressAware {
 	public Numpad(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.Numpad);
-        mPlayDtmf = 1 == a.getInt(com.rta.ipcall.R.styleable.Numpad_play_dtmf, 1);
+        mPlayDtmf = 1 == a.getInt(R.styleable.Numpad_play_dtmf, 1);
         a.recycle();
-		LayoutInflater.from(context).inflate(R.layout.numpad, this);
+		LayoutInflater.from(context).inflate(R.layout.ipcall_numpad, this);
 		setLongClickable(true);
 	}
 

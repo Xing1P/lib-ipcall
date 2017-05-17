@@ -22,6 +22,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.rta.ipcall.LinphoneManager;
+
 import org.linphone.core.LinphoneCall;
 
 import java.io.File;
@@ -565,7 +567,7 @@ public class InCallControlView {
 
             default:
 
-                if (currentCall.getState() == LinphoneCall.State.IncomingReceived || currentCall.getState() == LinphoneCall.State.CallIncomingEarlyMedia) {
+                if (LinphoneManager.isAllowIncomingCall() && (currentCall.getState() == LinphoneCall.State.IncomingReceived || currentCall.getState() == LinphoneCall.State.CallIncomingEarlyMedia)) {
                     mView.setVisibility(View.GONE);
                 } else {
                     mView.setVisibility(View.VISIBLE);

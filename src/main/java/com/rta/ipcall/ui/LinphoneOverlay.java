@@ -1,7 +1,6 @@
 package com.rta.ipcall.ui;
 
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
@@ -11,9 +10,7 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 
-import com.rta.ipcall.CallActivity;
 import com.rta.ipcall.LinphoneManager;
-import com.rta.ipcall.LinphoneService;
 
 import org.linphone.core.LinphoneCall;
 import org.linphone.core.LinphoneCallParams;
@@ -68,10 +65,12 @@ public class LinphoneOverlay extends org.linphone.mediastream.video.display.GL2J
 		setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
+				/*
 				Context context = LinphoneService.instance();
 				//Intent intent = new Intent(context, LinphoneActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				Intent intent = new Intent(context, CallActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				context.startActivity(intent);
+				*/
 			}
 		});
 		setOnLongClickListener(new OnLongClickListener() {

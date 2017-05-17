@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-package com.rta.ipcall.ui;
+package vn.rta.ipcall.ui;
 
 import android.app.AlertDialog;
 import android.content.Context;
@@ -27,15 +27,15 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.rta.ipcall.CallActivity;
 import com.rta.ipcall.LinphoneManager;
 import com.rta.ipcall.LinphonePreferences;
 import com.rta.ipcall.LinphoneService;
-import com.rta.ipcall.R;
 
 import org.linphone.core.LinphoneCore;
 import org.linphone.core.LinphoneCoreFactory;
 import org.linphone.mediastream.Log;
+
+import vn.rta.survey.android.R;
 
 public class Digit extends Button implements AddressAware {
 
@@ -167,9 +167,11 @@ public class Digit extends Button implements AddressAware {
 			if (!mPlayDtmf) return false;
 			if (!linphoneServiceReady()) return true;
 
+			/*
 			if (CallActivity.isInstanciated()) {
 				CallActivity.instance().resetControlsHidingCallBack();
 			}
+			*/
 			
 			LinphoneCore lc = LinphoneManager.getLc();
 			if (event.getAction() == MotionEvent.ACTION_DOWN && !mIsDtmfStarted) {

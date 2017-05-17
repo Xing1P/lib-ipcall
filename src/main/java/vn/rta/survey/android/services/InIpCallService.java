@@ -28,7 +28,6 @@ import android.widget.Toast;
 import com.rta.ipcall.LinphoneManager;
 import com.rta.ipcall.LinphoneService;
 import com.rta.ipcall.LinphoneUtils;
-import com.rta.ipcall.ui.InCallControls;
 
 import org.linphone.core.LinphoneCall;
 import org.linphone.core.LinphoneCore;
@@ -79,7 +78,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
     private List<LinphoneCall> callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
     private ViewGroup mainFrame;
-    private InCallControls inCallControls;
     private LinphoneCall currentCall;
 
     // Screen wake lock for incoming call
@@ -125,8 +123,8 @@ public class InIpCallService extends Service implements InCallControlView.Change
             //Linphone Core Listener control the UI when already in a call
             @Override
             public void callState(LinphoneCore lc, final LinphoneCall call, LinphoneCall.State state, String message) {
-                if (state == LinphoneCall.State.IncomingReceived) {
-                    Toast.makeText(InIpCallService.this, "Some people is calling you!", Toast.LENGTH_SHORT).show();
+                if (state == LinphoneCall.State.IncomingReceived && LinphoneManager.isAllowIncomingCall()) {
+                    Toast.makeText(InIpCallService.this, "Another call is waiting for response", Toast.LENGTH_SHORT).show();
                     return;
                 } else if (state == LinphoneCall.State.Connected)
                 {
@@ -150,24 +148,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 }
             }
         };
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-//            Toast.makeText(this, R.string.cpms_drawing_over_other_app_request, Toast.LENGTH_LONG).show();
-//            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-//                    Uri.parse("package:" + getPackageName()));
-//            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//            startActivity(i);
-//        } else {
-//            wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-//            if (mView == null) {
-//                incallView = new InCallControlView(this, wm, getApplicationContext());
-//                params = incallView.getLayoutParams();
-//                mView = incallView.getView();
-//                incallView.setOnchangeViewListener(this);
-//                incallView.setOnTriggerListener(this);
-//                mView.setOnTouchListener(new MyTouch());
-//                wm.addView(mView, params);
-//            }
-//        }
     }
 
 
@@ -374,7 +354,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
                             // For each active and running call
                             if (LinphoneCall.State.IncomingReceived == callInfo.getState()
                                     && callInfo.getState() != LinphoneCall.State.Paused
-                                    && !callInfo.equals(callSession)) {
+                                    && !callInfo.equals(callSession) && LinphoneManager.isAllowIncomingCall()) {
                                 LinphoneManager.getInstance().pauseOrResumeCall(callInfo);
                             }
                         }
@@ -406,12 +386,12 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
             case MUTE_ON:
                 if (LinphoneService.isReady()) {
-                    LinphoneManager.getLc().muteMic(true);
+                    LinphoneManager.getInstance().setEnableMicro(false);
                 }
                 break;
             case MUTE_OFF: {
                 if (LinphoneService.isReady()) {
-                    LinphoneManager.getLc().muteMic(false);
+                   LinphoneManager.getInstance().setEnableMicro(true);
                 }
                 break;
             }
