@@ -17,7 +17,7 @@ import vn.rta.survey.android.BuildConfig;
 
 /**
  * Created by Genius Doan on 18/04/2017.
- *
+ * <p>
  * Manage global configuration of the application.<br/>
  * Provides wrapper around preference content provider and define preference
  * keys constants
@@ -198,7 +198,7 @@ public class SipConfigManager {
     public static final String DTMF_MODE = "dtmf_mode";
     /**
      * Pause time in ms of DTMF , separator.<br/>
-     *
+     * <p>
      * Default is 300ms
      *
      * @see #setPreferenceIntegerValue(Context, String, Integer)
@@ -206,7 +206,7 @@ public class SipConfigManager {
     public static final String DTMF_PAUSE_TIME = "dtmf_pause_time";
     /**
      * Pause time in ms of DTMF , separator.<br/>
-     *
+     * <p>
      * Default is 2000ms
      *
      * @see #setPreferenceIntegerValue(Context, String, Integer)
@@ -636,7 +636,6 @@ public class SipConfigManager {
      * <a target="_blank" href=
      * "http://www.pjsip.org/pjnath/docs/html/structpj__ice__sess__options.htm#ac8cc479ffdceffe057e4b1f9f823d531"
      * >Pjsip documentation</a>
-     *
      */
     public static final String ICE_AGGRESSIVE = "ice_aggressive";
     /**
@@ -861,9 +860,9 @@ public class SipConfigManager {
     public static final String TSX_T4_TIMEOUT = "tsx_t4_timeout";
 
     /**
-     *  Transaction TD timeout value.
-     *  Transaction completed timer for INVITE.
-     *  -1 for default values
+     * Transaction TD timeout value.
+     * Transaction completed timer for INVITE.
+     * -1 for default values
      *
      * @see #setPreferenceIntegerValue(Context, String, Integer)
      */
@@ -1263,18 +1262,6 @@ public class SipConfigManager {
      * Maybe be changed for forked versions of the app.
      */
     public static final String AUTHORITY = BuildConfig.FLAVOR + ".rta.ipcall.prefs";
-    private static final String BASE_DIR_TYPE = "vnd.android.cursor.dir/vnd.rta.ipcall";
-    private static final String BASE_ITEM_TYPE = "vnd.android.cursor.item/vnd.rta.ipcall";
-
-    // Preference
-    /**
-     * Content type for preference provider.
-     */
-    public static final String PREF_CONTENT_TYPE = BASE_DIR_TYPE + ".pref";
-    /**
-     * Item type for preference provider.
-     */
-    public static final String PREF_CONTENT_ITEM_TYPE = BASE_ITEM_TYPE + ".pref";
     /**
      * Uri for preference content provider.<br/>
      * Deeply advised to not use directly
@@ -1286,7 +1273,6 @@ public class SipConfigManager {
      */
     public static final Uri PREF_URI = Uri.parse(ContentResolver.SCHEME_CONTENT + "://" + AUTHORITY + "/"
             + PREFS_TABLE_NAME);
-
     /**
      * Base uri for a specific preference in the content provider.<br/>
      * Deeply advised to not use directly
@@ -1299,13 +1285,12 @@ public class SipConfigManager {
     public static final Uri PREF_ID_URI_BASE = Uri.parse(ContentResolver.SCHEME_CONTENT + "://" + AUTHORITY + "/"
             + PREFS_TABLE_NAME + "/");
 
-    // Raz
+    // Preference
     /**
      * Reset uri to wipe the entire preference database clean.
      */
     public static final Uri RAZ_URI = Uri
             .parse(ContentResolver.SCHEME_CONTENT + "://" + AUTHORITY + "/" + RESET_TABLE_NAME);
-
     /**
      * Content value key for preference name.<br/>
      * It is strongly advised that you do NOT use this directly.
@@ -1326,7 +1311,6 @@ public class SipConfigManager {
      * @see #setPreferenceStringValue(Context, String, String)
      */
     public static final String FIELD_VALUE = "value";
-
     /**
      * Narrow band type codec preference key.<br/>
      *
@@ -1334,20 +1318,31 @@ public class SipConfigManager {
      */
     public static final String CODEC_NB = "nb";
 
+    // Raz
     /**
      * Wide band type codec preference key.<br/>
      *
      * @see #getCodecKey(String, String)
      */
     public static final String CODEC_WB = "wb";
+    private static final String BASE_DIR_TYPE = "vnd.android.cursor.dir/vnd.rta.ipcall";
+    /**
+     * Content type for preference provider.
+     */
+    public static final String PREF_CONTENT_TYPE = BASE_DIR_TYPE + ".pref";
+    private static final String BASE_ITEM_TYPE = "vnd.android.cursor.item/vnd.rta.ipcall";
+    /**
+     * Item type for preference provider.
+     */
+    public static final String PREF_CONTENT_ITEM_TYPE = BASE_ITEM_TYPE + ".pref";
 
     /**
      * Get the preference key for a codec priority
      *
      * @param codecName Name of the codec as known by pjsip. Example PCMU/8000/1
-     * @param type Type of the codec {@link #CODEC_NB} or {@link #CODEC_WB}
+     * @param type      Type of the codec {@link #CODEC_NB} or {@link #CODEC_WB}
      * @return The key to use to set/get the priority of a codec for a given
-     *         bandwidth
+     * bandwidth
      */
     public static String getCodecKey(String codecName, String type) {
         String[] codecParts = codecName.split("/");
@@ -1362,7 +1357,7 @@ public class SipConfigManager {
      * Get the preference <b>partial</b> key for a given network kind
      *
      * @param networkType Type of the network {@link ConnectivityManager}
-     * @param subType Subtype of the network {@link TelephonyManager}
+     * @param subType     Subtype of the network {@link TelephonyManager}
      * @return The partial key for the network kind
      */
     private static String keyForNetwork(int networkType, int subType) {
@@ -1393,7 +1388,7 @@ public class SipConfigManager {
      * Get preference key for the kind of bandwidth to associate to a network
      *
      * @param networkType Type of the network {@link ConnectivityManager}
-     * @param subType Subtype of the network {@link TelephonyManager}
+     * @param subType     Subtype of the network {@link TelephonyManager}
      * @return the preference key for the network kind passed in argument
      */
     public static String getBandTypeKey(int networkType, int subType) {
@@ -1416,8 +1411,8 @@ public class SipConfigManager {
     /**
      * Helper method to retrieve a csipsimple string config value
      *
-     * @param ctxt The context of your app
-     * @param key the key for the setting you want to get
+     * @param ctxt         The context of your app
+     * @param key          the key for the setting you want to get
      * @param defaultValue the value you want to return if nothing found
      * @return the preference value
      */
@@ -1448,8 +1443,8 @@ public class SipConfigManager {
     /**
      * Helper method to retrieve a csipsimple boolean config value
      *
-     * @param ctxt The context of your app
-     * @param key the key for the setting you want to get
+     * @param ctxt         The context of your app
+     * @param key          the key for the setting you want to get
      * @param defaultValue the value you want to return if nothing found
      * @return the preference value
      */
@@ -1480,8 +1475,8 @@ public class SipConfigManager {
     /**
      * Helper method to retrieve a csipsimple float config value
      *
-     * @param ctxt The context of your app
-     * @param key the key for the setting you want to get
+     * @param ctxt         The context of your app
+     * @param key          the key for the setting you want to get
      * @param defaultValue the value you want to return if nothing found
      * @return the preference value
      */
@@ -1512,8 +1507,8 @@ public class SipConfigManager {
     /**
      * Helper method to retrieve a csipsimple float config value
      *
-     * @param ctxt The context of your app
-     * @param key the key for the setting you want to get
+     * @param ctxt         The context of your app
+     * @param key          the key for the setting you want to get
      * @param defaultValue the value you want to return if nothing found
      * @return the preference value
      */
@@ -1535,8 +1530,8 @@ public class SipConfigManager {
     /**
      * Set the value of a preference string
      *
-     * @param ctxt The context of android app
-     * @param key The key config to change
+     * @param ctxt  The context of android app
+     * @param key   The key config to change
      * @param value The value to set to
      */
     public static void setPreferenceStringValue(Context ctxt, String key, String value) {
@@ -1549,8 +1544,8 @@ public class SipConfigManager {
     /**
      * Set the value of a preference string
      *
-     * @param ctxt The context of android app
-     * @param key The key config to change
+     * @param ctxt  The context of android app
+     * @param key   The key config to change
      * @param value The value to set to
      */
     public static void setPreferenceBooleanValue(Context ctxt, String key, boolean value) {
@@ -1564,8 +1559,8 @@ public class SipConfigManager {
     /**
      * Set the value of a preference string
      *
-     * @param ctxt The context of android app
-     * @param key The key config to change
+     * @param ctxt  The context of android app
+     * @param key   The key config to change
      * @param value The value to set to
      */
     public static void setPreferenceFloatValue(Context ctxt, String key, Float value) {
@@ -1578,8 +1573,8 @@ public class SipConfigManager {
     /**
      * Set the value of a preference integer
      *
-     * @param ctxt The context of android app
-     * @param key The key config to change
+     * @param ctxt  The context of android app
+     * @param key   The key config to change
      * @param value The value to set to
      */
     public static void setPreferenceIntegerValue(Context ctxt, String key, Integer value) {

@@ -28,23 +28,23 @@ import org.linphone.mediastream.Log;
 
 public class BootReceiver extends BroadcastReceiver {
 
-	@Override
-	public void onReceive(Context context, Intent intent) {
-		if (intent.getAction().equalsIgnoreCase(Intent.ACTION_SHUTDOWN)) {
-			Log.w("Device is shutting down, destroying LinphoneCore to unregister");
-			LinphoneManager.destroy();
-		} else {
-			String path = context.getFilesDir().getAbsolutePath() + "/.linphonerc";
-			LpConfig lpConfig = LinphoneCoreFactory.instance().createLpConfig(path);
-			boolean autostart = lpConfig.getBool("app", "auto_start", false);
-			android.util.Log.i("LinphoneBootReceiver", "Device is starting, auto_start is " + autostart);
-			if (autostart) {
-				if (!LinphoneService.isReady()) {
-					Intent lLinphoneServiceIntent = new Intent(Intent.ACTION_MAIN);
-					lLinphoneServiceIntent.setClass(context, LinphoneService.class);
-					context.startService(lLinphoneServiceIntent);
-				}
-			}
-		}
-	}
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent.getAction().equalsIgnoreCase(Intent.ACTION_SHUTDOWN)) {
+            Log.w("Device is shutting down, destroying LinphoneCore to unregister");
+            LinphoneManager.destroy();
+        } else {
+            String path = context.getFilesDir().getAbsolutePath() + "/.linphonerc";
+            LpConfig lpConfig = LinphoneCoreFactory.instance().createLpConfig(path);
+            boolean autostart = lpConfig.getBool("app", "auto_start", false);
+            android.util.Log.i("LinphoneBootReceiver", "Device is starting, auto_start is " + autostart);
+            if (autostart) {
+                if (!LinphoneService.isReady()) {
+                    Intent lLinphoneServiceIntent = new Intent(Intent.ACTION_MAIN);
+                    lLinphoneServiceIntent.setClass(context, LinphoneService.class);
+                    context.startService(lLinphoneServiceIntent);
+                }
+            }
+        }
+    }
 }

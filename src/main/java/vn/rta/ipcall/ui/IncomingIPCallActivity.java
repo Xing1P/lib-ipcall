@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
@@ -22,6 +23,7 @@ import android.support.v7.widget.Toolbar;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Chronometer;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -44,22 +46,6 @@ import java.util.List;
 import vn.rta.survey.android.R;
 
 public class IncomingIPCallActivity extends AppCompatActivity {
-    Toolbar mToolbar;
-    ImageView mAvatar, mAvatarPlaceHolder;
-    RelativeLayout btnAcceptCall, btnDeclineCall;
-    ImageButton btnMicro, btnDialpad, btnSpeaker, btnAddCall, btnMinimize;
-    TextView txtCallNumber;
-    CallLoadingIndicatorView avLoading;
-    private WindowManager wm;
-    private View mView;
-    int screenWidth, screenHeight;
-    LinphoneCall linphoneCall;
-    private Numpad numpad;
-    boolean isAlreadyAcceptedOrDenied = false, isInCall = false;
-    boolean isMicMuted = false, isSpeakerEnabled = false;
-    private Notification incallNotification;
-    private final int incallNotifId = 2212;
-
     public static final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,//width
             WindowManager.LayoutParams.WRAP_CONTENT,//height
@@ -69,12 +55,26 @@ public class IncomingIPCallActivity extends AppCompatActivity {
                     | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                     | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT);
-
+    private final int incallNotifId = 2212;
+    Toolbar mToolbar;
+    ImageView mAvatar, mAvatarPlaceHolder;
+    RelativeLayout btnAcceptCall, btnDeclineCall;
+    ImageButton btnMicro, btnDialpad, btnSpeaker, btnAddCall, btnMinimize;
+    TextView txtCallNumber;
+    TextView txtCallStatus;
+    CallLoadingIndicatorView avLoading;
+    int screenWidth, screenHeight;
+    LinphoneCall linphoneCall;
+    boolean isAlreadyAcceptedOrDenied = false, isInCall = false;
+    boolean isMicMuted = false, isSpeakerEnabled = false;
     // Gets an instance of the NotificationManager service
     NotificationManager mNotifyMgr;
-
-
-
+    private Chronometer mElapsedTime;
+    private WindowManager wm;
+    private View mMiniView;
+    private Chronometer mMiniElapsedTime;
+    private Numpad numpad;
+    private Notification incallNotification;
     private LinphoneCoreListenerBase mListener;
 
 
@@ -96,7 +96,14 @@ public class IncomingIPCallActivity extends AppCompatActivity {
             setAddCallButtonEnabled(true);
             avLoading.smoothToHide();
             btnAcceptCall.setVisibility(View.GONE);
+            txtCallStatus.setVisibility(View.GONE);
             isAlreadyAcceptedOrDenied = true;
+
+            if (mElapsedTime != null) {
+                mElapsedTime.setBase(SystemClock.elapsedRealtime() - LinphoneManager.getInstance().getCurrElapsedTime());
+                mElapsedTime.setVisibility(View.VISIBLE);
+                mElapsedTime.start();
+            }
         }
     }
 
@@ -120,7 +127,7 @@ public class IncomingIPCallActivity extends AppCompatActivity {
         }
         if (linphoneCall == null) {
             //No incoming call
-            List<LinphoneCall> callList =  LinphoneUtils.getRunningOrPausedCalls(LinphoneManager.getLc());
+            List<LinphoneCall> callList = LinphoneUtils.getRunningOrPausedCalls(LinphoneManager.getLc());
             if (!callList.isEmpty())
                 linphoneCall = callList.get(0);
             else {
@@ -150,6 +157,11 @@ public class IncomingIPCallActivity extends AppCompatActivity {
             public void onClick(View v) {
                 setAddCallButtonEnabled(false);
                 if (isInCall) {
+                    if (mElapsedTime != null) {
+                        mElapsedTime.stop();
+                        mElapsedTime.setTextColor(Color.parseColor("#bdbdbd"));
+                        LinphoneManager.getInstance().setCurrElapsedTime(0);
+                    }
                     hangUp();
                 } else {
                     decline();
@@ -216,6 +228,9 @@ public class IncomingIPCallActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 onBackPressed();
+                if (mElapsedTime != null)
+                    LinphoneManager.getInstance().setCurrElapsedTime(SystemClock.elapsedRealtime() - mElapsedTime.getBase());
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(IncomingIPCallActivity.this)) {
                     Toast.makeText(IncomingIPCallActivity.this, "Please grant permission for the functionality and try to open it again after permission was granted.", Toast.LENGTH_LONG).show();
                     Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -223,8 +238,9 @@ public class IncomingIPCallActivity extends AppCompatActivity {
                     i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(i);
                 } else {
-                    if (mView == null) {
-                        mView = getLayoutInflater().inflate(R.layout.sip_call_mini_horizontal, null);
+                    if (mMiniView == null) {
+                        mMiniView = getLayoutInflater().inflate(R.layout.sip_call_mini_horizontal, null);
+                        mMiniElapsedTime = (Chronometer) mMiniView.findViewById(R.id.miniElapsedTime);
                     }
 
                     params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
@@ -232,12 +248,17 @@ public class IncomingIPCallActivity extends AppCompatActivity {
                     params.height = getStatusBarHeight();
 
                     //At view and notifications
-                    if (mView != null) {
-                        LinphoneService.instance().setIncallMiniView(mView);
+                    if (mMiniView != null) {
+                        LinphoneService.instance().setIncallMiniView(mMiniView);
                         int count = 0;
-                        while (!mView.isShown() && count < 5) {
-                            wm.addView(mView, params);
+                        while (!mMiniView.isShown() && count < 5) {
+                            wm.addView(mMiniView, params);
                             count++;
+                        }
+
+                        if (mMiniElapsedTime != null) {
+                            mMiniElapsedTime.setBase(SystemClock.elapsedRealtime() - LinphoneManager.getInstance().getCurrElapsedTime());
+                            mMiniElapsedTime.start();
                         }
                     }
                     LinphoneService.instance().setIncallNotifId(incallNotifId);
@@ -246,9 +267,13 @@ public class IncomingIPCallActivity extends AppCompatActivity {
             }
         });
 
-        mView.setOnClickListener(new View.OnClickListener() {
+        mMiniView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                //Get time
+                LinphoneManager.getInstance().setCurrElapsedTime(SystemClock.elapsedRealtime() - mMiniElapsedTime.getBase());
+                mMiniElapsedTime.stop();
+
                 //Return back to call screen.
                 Intent intent = new Intent(IncomingIPCallActivity.this, IncomingIPCallActivity.class);
                 startActivity(intent);
@@ -263,7 +288,25 @@ public class IncomingIPCallActivity extends AppCompatActivity {
                 }
 
                 if (state == LinphoneCall.State.CallEnd || state == LinphoneCall.State.CallReleased || state == LinphoneCall.State.Error) {
+                    if (mElapsedTime != null) {
+                        mElapsedTime.stop();
+                        mElapsedTime.setTextColor(Color.parseColor("#bdbdbd"));
+                        LinphoneManager.getInstance().setCurrElapsedTime(0);
+                    }
                     dismissCallActivity();
+                }
+
+                if (state == LinphoneCall.State.Paused) {
+                    if (mElapsedTime != null) {
+                        mElapsedTime.stop();
+                        mElapsedTime.setTextColor(Color.parseColor("#bdbdbd"));
+                    }
+                }
+
+                if (state == LinphoneCall.State.Resuming) {
+                    if (mElapsedTime != null) {
+                        mElapsedTime.start();
+                    }
                 }
 
                 if (state == LinphoneCall.State.Connected || state == LinphoneCall.State.StreamsRunning) {
@@ -271,6 +314,12 @@ public class IncomingIPCallActivity extends AppCompatActivity {
                     btnAcceptCall.setVisibility(View.GONE);
                     isAlreadyAcceptedOrDenied = true;
                     LinphoneService.instance().setIsInCall(true);
+                    if (mElapsedTime != null) {
+                        txtCallStatus.setVisibility(View.GONE);
+                        mElapsedTime.setVisibility(View.VISIBLE);
+                        mElapsedTime.start();
+                        mElapsedTime.setBase(SystemClock.elapsedRealtime() - LinphoneManager.getInstance().getCurrElapsedTime());
+                    }
                 }
             }
         };
@@ -295,8 +344,8 @@ public class IncomingIPCallActivity extends AppCompatActivity {
         btnAddCall.setEnabled(false);
         btnMinimize.setEnabled(false);
 
-        if (mView != null && mView.isShown())
-            wm.removeView(mView);
+        if (mMiniView != null && mMiniView.isShown())
+            wm.removeView(mMiniView);
 
         new Handler().postDelayed(new Runnable() {
             @Override
@@ -329,10 +378,13 @@ public class IncomingIPCallActivity extends AppCompatActivity {
         btnSpeaker = (ImageButton) findViewById(R.id.btn_speaker);
         btnAddCall = (ImageButton) findViewById(R.id.btn_add_call);
         btnMinimize = (ImageButton) findViewById(R.id.btn_minimize);
+        mElapsedTime = (Chronometer) findViewById(R.id.elapsedTime);
+        txtCallStatus = (TextView) findViewById(R.id.txt_call_status);
         numpad = (Numpad) findViewById(R.id.numpad);
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-        mNotifyMgr  = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        mView = getLayoutInflater().inflate(R.layout.sip_call_mini_horizontal, null);
+        mNotifyMgr = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        mMiniView = getLayoutInflater().inflate(R.layout.sip_call_mini_horizontal, null);
+        mMiniElapsedTime = (Chronometer) mMiniView.findViewById(R.id.miniElapsedTime);
 
 
         Intent notifIntent = new Intent(IncomingIPCallActivity.this, IncomingIPCallActivity.class);
@@ -341,7 +393,7 @@ public class IncomingIPCallActivity extends AppCompatActivity {
         LinphoneCall call = LinphoneManager.getLc().getCurrentCall();
         incallNotification = new NotificationCompat.Builder(this)
                 .setContentTitle(call != null ? call.getRemoteAddress().getDisplayName() : "Unknown call")
-                .setContentText("Tap to return to call...")
+                .setContentText(getString(R.string.tap_to_return_to_call))
                 .setContentIntent(comebackIntent)
                 .setSmallIcon(R.drawable.ic_stat_default)
                 .setLargeIcon(BitmapFactory.decodeResource(this.getResources(), R.mipmap.ic_launcher))

@@ -27,20 +27,19 @@ import android.telephony.TelephonyManager;
  * Pause current SIP calls when GSM phone rings or is active.
  *
  * @author Guillaume Beraudo
- *
  */
 public class PhoneStateChangedReceiver extends BroadcastReceiver {
-	@Override
-	public void onReceive(Context context, Intent intent) {
-		final String extraState = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        final String extraState = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
 
-		if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(extraState)) {
-			LinphoneManager.setGsmIdle(false);
-			if (!LinphoneManager.isInstanciated())
-				return;
-			LinphoneManager.getLc().pauseAllCalls();
+        if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(extraState)) {
+            LinphoneManager.setGsmIdle(false);
+            if (!LinphoneManager.isInstanciated())
+                return;
+            LinphoneManager.getLc().pauseAllCalls();
         } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(extraState)) {
-        	LinphoneManager.setGsmIdle(true);
+            LinphoneManager.setGsmIdle(true);
         }
-	}
+    }
 }

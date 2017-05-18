@@ -59,17 +59,15 @@ public class InIpCallService extends Service implements InCallControlView.Change
     //TODO: Add Call Proximity Manager
     public static final String ACTION = "vn.rta.sipcall.service";
     public static final String ACTION_PHONE_STATE = "android.intent.action.PHONE_STATE";
+    public static final int MOVE_THRESHOLD = 15;
+    public static final int LONG_TIME_THRESHOLD = 300;
+    private static final int QUIT_DELAY = 3000;
+    private static final long DOUBLE_CLICK_TIME_DELTA = 300;//milliseconds
+    private final String TAG = "overlay service";
     private View mView;
     private WindowManager.LayoutParams params;
     private WindowManager wm;
-
-    public static final int MOVE_THRESHOLD = 15;
-    public static final int LONG_TIME_THRESHOLD = 300;
-    private final String TAG = "overlay service";
-    private static final int QUIT_DELAY = 3000;
-
     private InCallControlView incallView;
-    private static final long DOUBLE_CLICK_TIME_DELTA = 300;//milliseconds
     private long lastClickTime = 0;
     private float oldX;
     private float oldY;
@@ -115,6 +113,86 @@ public class InIpCallService extends Service implements InCallControlView.Change
     private LinphoneService service;
     private ServiceConnection connection;
     private AlertDialog infoDialog;
+    private BroadcastReceiver callStateReceiver = new BroadcastReceiver() {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (action.equals(SipManager.ACTION_SIP_CALL_CHANGED)) {
+                if (service != null) {
+                    synchronized (callMutex) {
+                        if ((service == null && !LinphoneService.isReady()) || LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc()).isEmpty())
+                            return;
+                        callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
+                        for (int i = 0; i < callsInfo.size(); i++) {
+                            currentCall = callsInfo.get(i);
+                            LinphoneCall.State state = currentCall.getState();
+                            if (state != LinphoneCall.State.Idle || state != LinphoneCall.State.CallReleased) {
+                                break;
+                            }
+                        }
+                        if (currentCall != null) {
+                            LinphoneCall mainCallInfo = currentCall;
+                            LinphoneCall.State state = mainCallInfo.getState();
+
+                            //int backgroundResId = R.drawable.bg_in_call_gradient_unidentified;
+
+                            // We manage wake lock
+                            switch (state.toString()) {
+                                case "IncomingReceived":
+                                case "IncomingEarlyMedia":
+                                case "EarlyUpdating":
+                                case "OutgoingInit":
+                                case "OutgoingProgress":
+                                case "OutgoingRinging":
+                                case "OutgoingEarlyMedia":
+                                case "StreamsRunning":
+                                case "Connected":
+                                case "Resuming":
+                                case "Updating":
+                                    if (wakeLock != null && !wakeLock.isHeld()) {
+                                        wakeLock.acquire();
+                                    }
+                                    break;
+                                case "Idle":
+                                case "CallEnd":
+                                case "Released":
+                                case "Error":
+                                    // This will release locks
+                                    //incallView.stopElapsedTimer();
+                                    result = result + incallView.getTimeStamp();
+                                    //RTALog.d("test call", " state = DISCONNECTED + start time = " + mainCallInfo.getConnectStart());
+                                    //RTALog.d("test call", " state = DISCONNECTED + start time = " + mainCallInfo.getConnectStart() + " and last status = " + mainCallInfo.getLastStatusComment());
+                                    //stopSelf();
+                                    //onDestroy();
+                                    return;
+
+                            }
+                        }
+                    }
+                }
+            } else if (action.equals(SipManager.ACTION_SIP_MEDIA_CHANGED)) {
+
+            } else if (action.equals(SipManager.ACTION_ZRTP_SHOW_SAS)) {
+
+            } else if (action.equals(ACTION_PHONE_STATE)) {
+                if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
+                        TelephonyManager.EXTRA_STATE_RINGING)) {
+
+                    // Phone number
+                    String incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+                    // Ringing state
+                    // This code will execute when the phone has an incoming call
+                } else if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
+                        TelephonyManager.EXTRA_STATE_IDLE)
+                        || intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
+                        TelephonyManager.EXTRA_STATE_OFFHOOK)) {
+                    // This code will execute when the call is answered or disconnected
+                }
+            }
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -126,11 +204,9 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 if (state == LinphoneCall.State.IncomingReceived && LinphoneManager.isAllowIncomingCall()) {
                     Toast.makeText(InIpCallService.this, "Another call is waiting for response", Toast.LENGTH_SHORT).show();
                     return;
-                } else if (state == LinphoneCall.State.Connected)
-                {
+                } else if (state == LinphoneCall.State.Connected) {
                     incallView.setCallState(call);
-                }
-                else if (state == LinphoneCall.State.Paused || state == LinphoneCall.State.PausedByRemote || state == LinphoneCall.State.Pausing) {
+                } else if (state == LinphoneCall.State.Paused || state == LinphoneCall.State.PausedByRemote || state == LinphoneCall.State.Pausing) {
                     ///TODO: Change UI when pause the call
                 } else if (state == LinphoneCall.State.Resuming) {
                     ///TODO: Change UI when resume the call
@@ -149,7 +225,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
             }
         };
     }
-
 
     @Override
     public IBinder onBind(Intent i) {
@@ -280,7 +355,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
         return Service.START_NOT_STICKY;
     }
 
-
     @Override
     public void onDestroy() {
         incallView.endCurrentCall();
@@ -391,7 +465,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 break;
             case MUTE_OFF: {
                 if (LinphoneService.isReady()) {
-                   LinphoneManager.getInstance().setEnableMicro(true);
+                    LinphoneManager.getInstance().setEnableMicro(true);
                 }
                 break;
             }
@@ -407,8 +481,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 if (LinphoneService.isReady()) {
                     LinphoneManager.getInstance().routeAudioToReceiver();
                     LinphoneManager.getLc().enableSpeaker(false);
-                }
-                else
+                } else
                     Toast.makeText(getApplicationContext(), "Speaker is not working!", Toast.LENGTH_SHORT).show();
                 break;
             }
@@ -563,7 +636,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
     }
 
-
     public boolean shouldActivateProximity() {
         return false;
     }
@@ -576,6 +648,20 @@ public class InIpCallService extends Service implements InCallControlView.Change
                 LinphoneManager.getLc().sendDtmf((char) keyCode);
                 dialFeedback.giveFeedback(dialTone);
             }
+        }
+    }
+
+    @Override
+    public void onChangeViewListener(int mode) {
+        wm.removeView(mView);
+        mView = incallView.getView();
+        params = incallView.getLayoutParams();
+        wm.addView(mView, params);
+        this.mode = mode;
+        incallView.setOnDtmfListener(this,/*callsInfo[0].getCallId()*/currentCall);
+        mView.setOnTouchListener(new MyTouch());
+        if (mode == InCallControlView.MODE_END_CALL) {
+            stopSelf();
         }
     }
 
@@ -632,102 +718,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
             return false;
         }
     }
-
-    @Override
-    public void onChangeViewListener(int mode) {
-        wm.removeView(mView);
-        mView = incallView.getView();
-        params = incallView.getLayoutParams();
-        wm.addView(mView, params);
-        this.mode = mode;
-        incallView.setOnDtmfListener(this,/*callsInfo[0].getCallId()*/currentCall);
-        mView.setOnTouchListener(new MyTouch());
-        if (mode == InCallControlView.MODE_END_CALL) {
-            stopSelf();
-        }
-    }
-
-    private BroadcastReceiver callStateReceiver = new BroadcastReceiver() {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-
-            if (action.equals(SipManager.ACTION_SIP_CALL_CHANGED)) {
-                if (service != null) {
-                    synchronized (callMutex) {
-                        if ((service == null && !LinphoneService.isReady()) || LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc()).isEmpty())
-                            return;
-                        callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
-                        for (int i = 0; i < callsInfo.size(); i++) {
-                            currentCall = callsInfo.get(i);
-                            LinphoneCall.State state = currentCall.getState();
-                            if (state != LinphoneCall.State.Idle || state != LinphoneCall.State.CallReleased) {
-                                break;
-                            }
-                        }
-                        if (currentCall != null) {
-                            LinphoneCall mainCallInfo = currentCall;
-                            LinphoneCall.State state = mainCallInfo.getState();
-
-                            //int backgroundResId = R.drawable.bg_in_call_gradient_unidentified;
-
-                            // We manage wake lock
-                            switch (state.toString()) {
-                                case "IncomingReceived":
-                                case "IncomingEarlyMedia":
-                                case "EarlyUpdating":
-                                case "OutgoingInit":
-                                case "OutgoingProgress":
-                                case "OutgoingRinging":
-                                case "OutgoingEarlyMedia":
-                                case "StreamsRunning":
-                                case "Connected":
-                                case "Resuming":
-                                case "Updating":
-                                    if (wakeLock != null && !wakeLock.isHeld()) {
-                                        wakeLock.acquire();
-                                    }
-                                    break;
-                                case "Idle":
-                                case "CallEnd":
-                                case "Released":
-                                case "Error":
-                                    // This will release locks
-                                    //incallView.stopElapsedTimer();
-                                    result = result + incallView.getTimeStamp();
-                                    //RTALog.d("test call", " state = DISCONNECTED + start time = " + mainCallInfo.getConnectStart());
-                                    //RTALog.d("test call", " state = DISCONNECTED + start time = " + mainCallInfo.getConnectStart() + " and last status = " + mainCallInfo.getLastStatusComment());
-                                    //stopSelf();
-                                    //onDestroy();
-                                    return;
-
-                            }
-                        }
-                    }
-                }
-            } else if (action.equals(SipManager.ACTION_SIP_MEDIA_CHANGED)) {
-
-            } else if (action.equals(SipManager.ACTION_ZRTP_SHOW_SAS)) {
-
-            } else if (action.equals(ACTION_PHONE_STATE)) {
-                if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
-                        TelephonyManager.EXTRA_STATE_RINGING)) {
-
-                    // Phone number
-                    String incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
-                    // Ringing state
-                    // This code will execute when the phone has an incoming call
-                } else if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
-                        TelephonyManager.EXTRA_STATE_IDLE)
-                        || intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
-                        TelephonyManager.EXTRA_STATE_OFFHOOK)) {
-                    // This code will execute when the call is answered or disconnected
-                }
-            }
-        }
-    };
-
 
     public class CallReciever extends BroadcastReceiver {
 

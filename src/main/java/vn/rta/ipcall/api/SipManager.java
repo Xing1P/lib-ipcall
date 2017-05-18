@@ -256,9 +256,9 @@ public final class SipManager {
      * <li>{@link #EXTRA_SIP_CALL_MIN_STATE} minimum call state for this plugin to be active. Default {@link SipCallSession.InvState#EARLY}.</li>
      * <li>{@link #EXTRA_SIP_CALL_MAX_STATE} maximum call state for this plugin to be active. Default {@link SipCallSession.InvState#CONFIRMED}.</li>
      * <li>{@link #EXTRA_SIP_CALL_CALL_WAY} bitmask flag for selecting only one way.
-     *  {@link #BITMASK_IN} for incoming;
-     *  {@link #BITMASK_OUT} for outgoing.
-     *  Default ({@link #BITMASK_IN} | {@link #BITMASK_OUT}) (any way).</li>
+     * {@link #BITMASK_IN} for incoming;
+     * {@link #BITMASK_OUT} for outgoing.
+     * Default ({@link #BITMASK_IN} | {@link #BITMASK_OUT}) (any way).</li>
      * </ul>
      * Receiver activity will get an extra with key {@value #EXTRA_CALL_INFO} with a {@link SipCallSession}.
      */
@@ -402,6 +402,7 @@ public final class SipManager {
     // EXTRAS
     /**
      * Extra key to contains infos about a sip call.<br/>
+     *
      * @see SipCallSession
      */
     public static final String EXTRA_CALL_INFO = "call_info";
@@ -419,17 +420,20 @@ public final class SipManager {
 
     /**
      * Extra key to contain an string to path of a file.<br/>
+     *
      * @see java.lang.String
      */
     public static final String EXTRA_FILE_PATH = "file_path";
 
     /**
      * Target in a sip launched call.
+     *
      * @see #ACTION_SIP_CALL_LAUNCH
      */
     public static final String EXTRA_SIP_CALL_TARGET = "call_target";
     /**
      * Options of a sip launched call.
+     *
      * @see #ACTION_SIP_CALL_LAUNCH
      */
     public static final String EXTRA_SIP_CALL_OPTIONS = "call_options";
@@ -470,6 +474,12 @@ public final class SipManager {
      * Constant for network errors return
      */
     public static final int ERROR_CURRENT_NETWORK = 10;
+    /**
+     * Current api version number.<br/>
+     * Major version x 1000 + minor version. <br/>
+     * Major version are backward compatible.
+     */
+    public static final int CURRENT_API = 2005;
 
     /**
      * Possible presence status.
@@ -496,11 +506,4 @@ public final class SipManager {
          */
         AWAY,
     }
-
-    /**
-     * Current api version number.<br/>
-     * Major version x 1000 + minor version. <br/>
-     * Major version are backward compatible.
-     */
-    public static final int CURRENT_API = 2005;
 }

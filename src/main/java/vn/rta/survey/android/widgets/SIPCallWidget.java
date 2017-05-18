@@ -49,11 +49,11 @@ import vn.rta.survey.android.manager.IPCallManager;
  */
 public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIListener {
     private final static String t = "MediaWidget";
+    LinearLayout buttonLayout;
     private AppCompatButton
             mCaptureButton;
     private String mBinaryName;
     private String mInstanceFolder;
-    LinearLayout buttonLayout;
     private boolean isShowQuestionText;
     private FormEntryActivity mEntryActivity;
     private SIPProfile sipProfile;
@@ -83,7 +83,6 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         if (xPathFuncExpr != null) {
             sipProfile = ExternalDataUtil.populateSIPValue(mPrompt.getIndex(), xPathFuncExpr);
         }
-
 
 
         locked = false;

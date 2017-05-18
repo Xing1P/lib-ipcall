@@ -45,17 +45,37 @@ import vn.rta.survey.android.utilities.RTALog;
  * Created by ThiNguyen on 8/29/16.
  */
 public class InCallControlView {
-    public interface ChangeViewListener {
-        public void onChangeViewListener(int mode);
-    }
+    public static final int MODE_INCALL_MAIN = 1;
+    public static final int MODE_INCALL_MINI = 2;
+    public static final int MODE_INCALL_KEY_PAD = 3;
+    public static final int MODE_END_CALL = 4;
 
-    public interface OnDtmfListener {
-        void onDtmf(LinphoneCall call, int keyCode, int dialTone);
-    }
-
+    ;
+    public static final String EXT_RTA = ".rta";
+    public static final String AUDIO_FILE_NAME_PREFIX = "rs_audio";
+    public static final String EXT_3GP = ".3gp";
+    public static final WindowManager.LayoutParams PARAM = new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,//width
+            WindowManager.LayoutParams.WRAP_CONTENT,//height
+            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                    | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            PixelFormat.TRANSLUCENT);
     // Here we need a map to quickly find if the clicked button id is in the map keys
     @SuppressLint("UseSparseArrays")
     private static final Map<Integer, int[]> DIGITS_BTNS = new HashMap<Integer, int[]>();
+    private static final String THIS_FILE = "InCallControls";
+    private static final String TAG = "InCallControlView";
+    private static final String DEFAULT_TEXT_NOTE_FILE_NAME = "ip_call_%s%s";
+    //recording
+    private static final int COUNTER_UPDATE_MSG_ID = 123;
+    private static final String DEFAULT_AUDIO_FILE_NAME = "rs_audio_%s%s";
+    private static final String FILE_NAME_DEFAUL = "defaut";
+    private static Service mService;
+    private static String fileName = FILE_NAME_DEFAUL;
+    private static int count = 0;
 
     static {
         DIGITS_BTNS.put(0, new int[]{ToneGenerator.TONE_DTMF_0, KeyEvent.KEYCODE_0});
@@ -72,17 +92,7 @@ public class InCallControlView {
         DIGITS_BTNS.put(11, new int[]{ToneGenerator.TONE_DTMF_S, KeyEvent.KEYCODE_STAR});
     }
 
-    ;
-
-    private static final String THIS_FILE = "InCallControls";
-    private static final String TAG = "InCallControlView";
-    public static final int MODE_INCALL_MAIN = 1;
-    public static final int MODE_INCALL_MINI = 2;
-    public static final int MODE_INCALL_KEY_PAD = 3;
-    public static final int MODE_END_CALL = 4;
-
     IOnCallActionTrigger onTriggerListener;
-
     private LinphoneCall currentCall;
     //private MenuBuilder btnMenuBuilder;
     private boolean supportMultipleCalls = false;
@@ -95,7 +105,6 @@ public class InCallControlView {
     private ImageView speakerButton;
     private LinearLayout endCallView;
     private Chronometer elapsedTime;
-
     private TextView endTime;
     private OnDtmfListener onDtmfListener;
     private int callID;
@@ -105,10 +114,8 @@ public class InCallControlView {
     private boolean isMute = false;
     private boolean isHold = false;
     private boolean isSpeaker = false;
-
     //mini view mode
     private ImageView expandButton;
-
     //key pad mode
     private ImageView backspace;
     private TextView phoneNumber;
@@ -130,10 +137,7 @@ public class InCallControlView {
     private LinearLayout endCallButtonInPad;
     private View inMainView;
     private View keyPadView;
-
     private StringBuilder numberCall = new StringBuilder();
-
-    private static Service mService;
     private WindowManager.LayoutParams params;
     private WindowManager wm;
     private LayoutInflater inflater;
@@ -141,20 +145,9 @@ public class InCallControlView {
     private Context mcontext;
     private int modeView = MODE_INCALL_MAIN;
     private String mDualTime = "";
-
-    public static final String EXT_RTA = ".rta";
-    private static final String DEFAULT_TEXT_NOTE_FILE_NAME = "ip_call_%s%s";
-    //recording
-    private static final int COUNTER_UPDATE_MSG_ID = 123;
-    private static final String DEFAULT_AUDIO_FILE_NAME = "rs_audio_%s%s";
-    public static final String AUDIO_FILE_NAME_PREFIX = "rs_audio";
-    public static final String EXT_3GP = ".3gp";
-    private static final String FILE_NAME_DEFAUL = "defaut";
     // default setting
     private File mRecordingLocation;
-
     private Handler mHandler;
-    private static String fileName = FILE_NAME_DEFAUL;
     private AtomicBoolean mIsPlaying = new AtomicBoolean(false);
     private AtomicBoolean mIsRecording = new AtomicBoolean(false);
 
@@ -171,18 +164,7 @@ public class InCallControlView {
     private boolean isFullView = true;
     private boolean isRecoding = false;
     private boolean isFirstChangeKeyPad = true;
-
-    private static int count = 0;
-    public static final WindowManager.LayoutParams PARAM = new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,//width
-            WindowManager.LayoutParams.WRAP_CONTENT,//height
-            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                    | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-            PixelFormat.TRANSLUCENT);
-
+    private boolean callOngoing = false;
     public InCallControlView(Service ser, WindowManager wm, Context mcontext) {
         this.mcontext = mcontext;
         InCallControlView.mService = ser;
@@ -200,6 +182,29 @@ public class InCallControlView {
         mView = inflater.inflate(R.layout.sip_incall, null);
         inMainView = mView;
         initMainControls();
+
+    }
+
+    /**
+     * @param variableName - name of drawable, e.g R.drawable.<b>image</b>
+     * @return integer id of resource
+     * @author Lonkly
+     */
+    public static int getResId(String variableName, Class<?> class1) {
+
+        Field field = null;
+        int resId = 0;
+        try {
+            field = class1.getField(variableName);
+            try {
+                resId = field.getInt(null);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return resId;
 
     }
 
@@ -526,8 +531,6 @@ public class InCallControlView {
         return params;
     }
 
-    private boolean callOngoing = false;
-
     public void setEnabledMediaButtons(boolean isInCall) {
         callOngoing = isInCall;
     }
@@ -588,36 +591,12 @@ public class InCallControlView {
         onTriggerListener = listener;
     }
 
-
     public WindowManager getWm() {
         return wm;
     }
 
     public void setWm(WindowManager wm) {
         this.wm = wm;
-    }
-
-    /**
-     * @param variableName - name of drawable, e.g R.drawable.<b>image</b>
-     * @return integer id of resource
-     * @author Lonkly
-     */
-    public static int getResId(String variableName, Class<?> class1) {
-
-        Field field = null;
-        int resId = 0;
-        try {
-            field = class1.getField(variableName);
-            try {
-                resId = field.getInt(null);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return resId;
-
     }
 
     //----------Method to create an AlertBox -------------
@@ -712,5 +691,13 @@ public class InCallControlView {
             speakerButton.setEnabled(true);
         if (keyBoardButton != null)
             keyBoardButton.setEnabled(true);
+    }
+
+    public interface ChangeViewListener {
+        public void onChangeViewListener(int mode);
+    }
+
+    public interface OnDtmfListener {
+        void onDtmf(LinphoneCall call, int keyCode, int dialTone);
     }
 }

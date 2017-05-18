@@ -1,22 +1,22 @@
 /**
  * Copyright (C) 2010-2012 Regis Montoya (aka r3gis - www.r3gis.fr)
  * This file is part of CSipSimple.
- *
- *  CSipSimple is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *  If you own a pjsip commercial license you can also redistribute it
- *  and/or modify it under the terms of the GNU Lesser General Public License
- *  as an android library.
- *
- *  CSipSimple is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with CSipSimple.  If not, see <http://www.gnu.org/licenses/>.
+ * <p>
+ * CSipSimple is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * If you own a pjsip commercial license you can also redistribute it
+ * and/or modify it under the terms of the GNU Lesser General Public License
+ * as an android library.
+ * <p>
+ * CSipSimple is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * <p>
+ * You should have received a copy of the GNU General Public License
+ * along with CSipSimple.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package vn.rta.ipcall.utils;
@@ -47,21 +47,34 @@ import vn.rta.ipcall.api.SipConfigManager;
 @Deprecated
 public class PreferencesProviderWrapper {
 
-    private static final String THIS_FILE = "Prefs";
-    private ContentResolver resolver;
-    private ConnectivityManager connectivityManager;
-    private Context context;
-
     public static final String LIB_CAP_TLS = PreferencesWrapper.LIB_CAP_TLS;
     public static final String LIB_CAP_SRTP = PreferencesWrapper.LIB_CAP_SRTP;
     public static final String HAS_BEEN_QUIT = PreferencesWrapper.HAS_BEEN_QUIT;
     public static final String HAS_ALREADY_SETUP_SERVICE = PreferencesWrapper.HAS_ALREADY_SETUP_SERVICE;
+    private static final String THIS_FILE = "Prefs";
+    private ContentResolver resolver;
+    private ConnectivityManager connectivityManager;
+    private Context context;
 
     public PreferencesProviderWrapper(Context aContext) {
         context = aContext;
         resolver = aContext.getContentResolver();
         connectivityManager = (ConnectivityManager) aContext
                 .getSystemService(Context.CONNECTIVITY_SERVICE);
+    }
+
+    public final static PackageInfo getCurrentPackageInfos(Context ctx) {
+        PackageInfo pinfo = null;
+        try {
+            pinfo = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
+        } catch (NameNotFoundException e) {
+            Log.e(THIS_FILE, "Impossible to find version of current package !!");
+        }
+        return pinfo;
+    }
+
+    public static File getRecordsFolder(Context ctxt) {
+        return PreferencesWrapper.getRecordsFolder(ctxt);
     }
 
     /**
@@ -105,6 +118,8 @@ public class PreferencesProviderWrapper {
         SipConfigManager.setPreferenceStringValue(context, key, newValue);
     }
 
+    // Network part
+
     public void setPreferenceBooleanValue(String key, boolean newValue) {
         SipConfigManager.setPreferenceBooleanValue(context, key, newValue);
     }
@@ -112,8 +127,6 @@ public class PreferencesProviderWrapper {
     public void setPreferenceFloatValue(String key, float newValue) {
         SipConfigManager.setPreferenceFloatValue(context, key, newValue);
     }
-
-    // Network part
 
     // Check for wifi
     private boolean isValidWifiConnectionFor(NetworkInfo ni, String suffix) {
@@ -139,13 +152,13 @@ public class PreferencesProviderWrapper {
         boolean valid_for_edge = getPreferenceBooleanValue("use_edge_" + suffix, false);
         boolean valid_for_gprs = getPreferenceBooleanValue("use_gprs_" + suffix, false);
         boolean valid_for_roaming = getPreferenceBooleanValue("use_roaming_" + suffix, true);
-        
-        if(!valid_for_roaming && ni != null) {
-            if(ni.isRoaming()) {
+
+        if (!valid_for_roaming && ni != null) {
+            if (ni.isRoaming()) {
                 return false;
             }
         }
-        
+
         if ((valid_for_3g || valid_for_edge || valid_for_gprs) &&
                 ni != null) {
             int type = ni.getType();
@@ -221,20 +234,20 @@ public class PreferencesProviderWrapper {
 
     /**
      * Say whether current connection is valid for outgoing calls
-     * 
+     *
      * @return true if connection is valid
      */
     public boolean isValidConnectionForOutgoing() {
         return isValidConnectionForOutgoing(true);
     }
-    
+
     /**
      * Say whether current connection is valid for outgoing calls
      * @param considerQuit pass true if we should consider app quitted as a reason to not consider available for outgoing
      * @return true if connection is valid
      */
     public boolean isValidConnectionForOutgoing(boolean considerQuit) {
-        if(considerQuit) {
+        if (considerQuit) {
             if (getPreferenceBooleanValue(PreferencesWrapper.HAS_BEEN_QUIT, false)) {
                 // Don't go further, we have been explicitly stopped
                 return false;
@@ -246,7 +259,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Say whether current connection is valid for incoming calls
-     * 
+     *
      * @return true if connection is valid
      */
     public boolean isValidConnectionForIncoming() {
@@ -279,7 +292,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Get the audio codec quality setting
-     * 
+     *
      * @return the audio quality
      */
     public int getInCallMode() {
@@ -305,13 +318,15 @@ public class PreferencesProviderWrapper {
         return getPreferenceBooleanValue(SipConfigManager.SET_AUDIO_GENERATE_TONE);
     }
 
+    // / ---- PURE SIP SETTINGS -----
+
     public float getInitialVolumeLevel() {
         return (float) (getPreferenceFloatValue(SipConfigManager.SND_STREAM_LEVEL, 8.0f) / 10.0f);
     }
 
     /**
      * Get sip ringtone
-     * 
+     *
      * @return string uri
      */
     public String getRingtone() {
@@ -323,8 +338,6 @@ public class PreferencesProviderWrapper {
         }
         return ringtone;
     }
-
-    // / ---- PURE SIP SETTINGS -----
 
     public boolean isTCPEnabled() {
         return getPreferenceBooleanValue(SipConfigManager.ENABLE_TCP);
@@ -372,7 +385,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Retrieve UDP keep alive interval for the current connection
-     * 
+     *
      * @return KA Interval in second
      */
     public int getUdpKeepAliveInterval() {
@@ -382,7 +395,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Retrieve TCP keep alive interval for the current connection
-     * 
+     *
      * @return KA Interval in second
      */
     public int getTcpKeepAliveInterval() {
@@ -392,7 +405,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Retrieve TLS keep alive interval for the current connection
-     * 
+     *
      * @return KA Interval in second
      */
     public int getTlsKeepAliveInterval() {
@@ -412,6 +425,8 @@ public class PreferencesProviderWrapper {
         return getPreferenceIntegerValue(SipConfigManager.TLS_METHOD);
     }
 
+    // Utils
+
     public String getUserAgent(Context ctx) {
         String userAgent = getPreferenceStringValue(SipConfigManager.USER_AGENT);
         if (userAgent.equalsIgnoreCase("RTAIpCall")) {
@@ -426,18 +441,6 @@ public class PreferencesProviderWrapper {
         return userAgent;
     }
 
-    public final static PackageInfo getCurrentPackageInfos(Context ctx) {
-        PackageInfo pinfo = null;
-        try {
-            pinfo = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
-        } catch (NameNotFoundException e) {
-            Log.e(THIS_FILE, "Impossible to find version of current package !!");
-        }
-        return pinfo;
-    }
-
-    // Utils
-
     /**
      * Check TCP/UDP validity of a network port
      */
@@ -445,9 +448,11 @@ public class PreferencesProviderWrapper {
         return (port >= 0 && port < 65535);
     }
 
+    // Media part
+
     /**
      * Get a property from android property subsystem
-     * 
+     *
      * @param prop property to get
      * @return the value of the property command line or null if failed
      */
@@ -469,8 +474,6 @@ public class PreferencesProviderWrapper {
         return null;
     }
 
-    // Media part
-
     /**
      * Get auto close time after end of the call To avoid crash after hangup --
      * android 1.5 only but even sometimes crash
@@ -481,7 +484,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Whether echo cancellation is enabled
-     * 
+     *
      * @return true if enabled
      */
     public boolean hasEchoCancellation() {
@@ -497,7 +500,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Get the audio codec quality setting
-     * 
+     *
      * @return the audio quality
      */
     public long getMediaQuality() {
@@ -517,7 +520,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Get whether turn is enabled
-     * 
+     *
      * @return 1 if enabled (pjstyle)
      */
     public int getStunEnabled() {
@@ -526,7 +529,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Get turn server
-     * 
+     *
      * @return host:port or blank if not set
      */
     public String getTurnServer() {
@@ -536,7 +539,7 @@ public class PreferencesProviderWrapper {
     /**
      * Setup codecs list Should be only done by the service that get infos from
      * the sip stack(s)
-     * 
+     *
      * @param codecs the list of codecs
      */
     public void setCodecList(List<String> codecs) {
@@ -553,11 +556,11 @@ public class PreferencesProviderWrapper {
         }
     }
 
+    // DTMF
+
     public void setLibCapability(String cap, boolean canDo) {
         setPreferenceBooleanValue(PreferencesWrapper.BACKUP_PREFIX + cap, canDo);
     }
-
-    // DTMF
 
     public boolean useSipInfoDtmf() {
         return (getPreferenceIntegerValue(SipConfigManager.DTMF_MODE) == SipConfigManager.DTMF_MODE_INFO);
@@ -567,15 +570,15 @@ public class PreferencesProviderWrapper {
         return (getPreferenceIntegerValue(SipConfigManager.DTMF_MODE) == SipConfigManager.DTMF_MODE_INBAND);
     }
 
+    // Codecs
+
     public boolean forceDtmfRTP() {
         return (getPreferenceIntegerValue(SipConfigManager.DTMF_MODE) == SipConfigManager.DTMF_MODE_RTP);
     }
 
-    // Codecs
-
     /**
      * Get the codec priority
-     * 
+     *
      * @param codecName codec name formated in the pjsip format (the
      *            corresponding pref is
      *            codec_{{lower(codecName)}}_{{codecFreq}})
@@ -600,7 +603,7 @@ public class PreferencesProviderWrapper {
 
     /**
      * Set the priority for the codec for a given bandwidth type
-     * 
+     *
      * @param codecName the name of the codec as announced by codec
      * @param type bandwidth type <br/>
      *            For now, valid constants are :
@@ -614,9 +617,5 @@ public class PreferencesProviderWrapper {
             setPreferenceStringValue(key, newValue);
         }
         // TODO : else raise error
-    }
-
-    public static File getRecordsFolder(Context ctxt) {
-        return PreferencesWrapper.getRecordsFolder(ctxt);
     }
 }

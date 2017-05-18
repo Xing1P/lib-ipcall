@@ -30,15 +30,19 @@ public class CallLoadingIndicatorView extends View {
 
     private static final int MIN_SHOW_TIME = 500; // ms
     private static final int MIN_DELAY = 500; // ms
-
+    int mMinWidth;
+    int mMaxWidth;
+    int mMinHeight;
+    int mMaxHeight;
+    boolean mKeepOriginDelay;
     private long mStartTime = -1;
-
     private boolean mPostedHide = false;
-
     private boolean mPostedShow = false;
-
     private boolean mDismissed = false;
-
+    private Indicator mIndicator;
+    private int mIndicatorColor;
+    private int mAnimationDuration;
+    private boolean mShouldStartAnimationDrawable;
     private final Runnable mDelayedHide = new Runnable() {
 
         @Override
@@ -48,7 +52,6 @@ public class CallLoadingIndicatorView extends View {
             setVisibility(View.GONE);
         }
     };
-
     private final Runnable mDelayedShow = new Runnable() {
 
         @Override
@@ -61,40 +64,28 @@ public class CallLoadingIndicatorView extends View {
         }
     };
 
-    int mMinWidth;
-    int mMaxWidth;
-    int mMinHeight;
-    int mMaxHeight;
-
-    private Indicator mIndicator;
-    private int mIndicatorColor;
-    private int mAnimationDuration;
-    boolean mKeepOriginDelay;
-
-    private boolean mShouldStartAnimationDrawable;
-
     public CallLoadingIndicatorView(Context context) {
         super(context);
-        init(context, null,0,0);
+        init(context, null, 0, 0);
     }
 
     public CallLoadingIndicatorView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        init(context, attrs,0,R.style.AVLoadingIndicatorView);
+        init(context, attrs, 0, R.style.AVLoadingIndicatorView);
     }
 
     public CallLoadingIndicatorView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init(context, attrs,defStyleAttr,R.style.AVLoadingIndicatorView);
+        init(context, attrs, defStyleAttr, R.style.AVLoadingIndicatorView);
     }
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public CallLoadingIndicatorView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
-        init(context,attrs,defStyleAttr,R.style.AVLoadingIndicatorView);
+        init(context, attrs, defStyleAttr, R.style.AVLoadingIndicatorView);
     }
 
-    private void init(Context context,AttributeSet attrs,int defStyleAttr, int defStyleRes) {
+    private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         mMinWidth = 24;
         mMaxWidth = 48;
         mMinHeight = 24;
@@ -107,12 +98,12 @@ public class CallLoadingIndicatorView extends View {
         mMaxWidth = a.getDimensionPixelSize(R.styleable.CallLoadingIndicatorView_maxWidth, mMaxWidth);
         mMinHeight = a.getDimensionPixelSize(R.styleable.CallLoadingIndicatorView_minHeight, mMinHeight);
         mMaxHeight = a.getDimensionPixelSize(R.styleable.CallLoadingIndicatorView_maxHeight, mMaxHeight);
-        String indicatorName=a.getString(R.styleable.CallLoadingIndicatorView_indicatorName);
-        mIndicatorColor=a.getColor(R.styleable.CallLoadingIndicatorView_indicatorColor, Color.WHITE);
+        String indicatorName = a.getString(R.styleable.CallLoadingIndicatorView_indicatorName);
+        mIndicatorColor = a.getColor(R.styleable.CallLoadingIndicatorView_indicatorColor, Color.WHITE);
         mAnimationDuration = a.getInteger(R.styleable.CallLoadingIndicatorView_animationDuration, 0);
         mKeepOriginDelay = a.getBoolean(R.styleable.CallLoadingIndicatorView_keepOriginDelay, false);
         setIndicator(indicatorName);
-        if (mIndicator==null){
+        if (mIndicator == null) {
             setIndicator(DEFAULT_INDICATOR);
         }
         a.recycle();
@@ -120,6 +111,40 @@ public class CallLoadingIndicatorView extends View {
 
     public Indicator getIndicator() {
         return mIndicator;
+    }
+
+    /**
+     * You should pay attention to pass this parameter with two way:
+     * for example:
+     * 1. Only class Name,like "SimpleIndicator".(This way would use default package name with
+     * "com.wang.avi.indicators")
+     * 2. Class name with full package,like "com.my.android.indicators.SimpleIndicator".
+     *
+     * @param indicatorName the class must be extend Indicator .
+     */
+    public void setIndicator(String indicatorName) {
+        if (TextUtils.isEmpty(indicatorName)) {
+            return;
+        }
+        StringBuilder drawableClassName = new StringBuilder();
+        if (!indicatorName.contains(".")) {
+            String defaultPackageName = getClass().getPackage().getName();
+            drawableClassName.append(defaultPackageName)
+                    .append(".indicators")
+                    .append(".");
+        }
+        drawableClassName.append(indicatorName);
+        try {
+            Class<?> drawableClass = Class.forName(drawableClassName.toString());
+            Indicator indicator = (Indicator) drawableClass.newInstance();
+            setIndicator(indicator);
+        } catch (ClassNotFoundException e) {
+            Log.e(TAG, "Didn't find your class , check the name again !");
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
     }
 
     public void setIndicator(Indicator d) {
@@ -141,7 +166,6 @@ public class CallLoadingIndicatorView extends View {
         }
     }
 
-
     /**
      * setIndicatorColor(0xFF00FF00)
      * or
@@ -152,66 +176,31 @@ public class CallLoadingIndicatorView extends View {
      * setIndicatorColor(0xFF00FF00)
      * or
      * setIndicatorColor(getResources().getColor(android.R.color.black))
+     *
      * @param color
      */
-    public void setIndicatorColor(int color){
-        this.mIndicatorColor=color;
+    public void setIndicatorColor(int color) {
+        this.mIndicatorColor = color;
         mIndicator.setColor(color);
     }
 
-
-    /**
-     * You should pay attention to pass this parameter with two way:
-     * for example:
-     * 1. Only class Name,like "SimpleIndicator".(This way would use default package name with
-     * "com.wang.avi.indicators")
-     * 2. Class name with full package,like "com.my.android.indicators.SimpleIndicator".
-     * @param indicatorName the class must be extend Indicator .
-     */
-    public void setIndicator(String indicatorName){
-        if (TextUtils.isEmpty(indicatorName)){
-            return;
-        }
-        StringBuilder drawableClassName=new StringBuilder();
-        if (!indicatorName.contains(".")){
-            String defaultPackageName=getClass().getPackage().getName();
-            drawableClassName.append(defaultPackageName)
-                    .append(".indicators")
-                    .append(".");
-        }
-        drawableClassName.append(indicatorName);
-        try {
-            Class<?> drawableClass = Class.forName(drawableClassName.toString());
-            Indicator indicator = (Indicator) drawableClass.newInstance();
-            setIndicator(indicator);
-        } catch (ClassNotFoundException e) {
-            Log.e(TAG,"Didn't find your class , check the name again !");
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void setAnimationDuration(int duration)
-    {
+    public void setAnimationDuration(int duration) {
         this.mAnimationDuration = duration;
         mIndicator.setDuration(duration);
     }
 
-    public void setKeepOriginDelay(boolean isKeep)
-    {
+    public void setKeepOriginDelay(boolean isKeep) {
         this.mKeepOriginDelay = isKeep;
         mIndicator.setKeepOriginDelay(isKeep);
     }
 
-    public void smoothToShow(){
-        startAnimation(AnimationUtils.loadAnimation(getContext(),android.R.anim.fade_in));
+    public void smoothToShow() {
+        startAnimation(AnimationUtils.loadAnimation(getContext(), android.R.anim.fade_in));
         setVisibility(VISIBLE);
     }
 
-    public void smoothToHide(){
-        startAnimation(AnimationUtils.loadAnimation(getContext(),android.R.anim.fade_out));
+    public void smoothToHide() {
+        startAnimation(AnimationUtils.loadAnimation(getContext(), android.R.anim.fade_out));
         setVisibility(GONE);
     }
 

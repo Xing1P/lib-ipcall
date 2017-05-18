@@ -1,6 +1,7 @@
 package vn.rta.survey.android.manager;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
@@ -47,7 +48,7 @@ import vn.rta.survey.android.services.InIpCallService;
 /**
  * Created by Genius Doan on 18/04/2017.
  * Manager all things about IPCall.
- *
+ * <p>
  * It is a connection between Linphone services and widgets
  * Use to create new call, receive call, manage connection, UI, notifications
  */
@@ -218,8 +219,7 @@ public class IPCallManager {
             if (!LinphoneService.isReady()) {
                 Log.e(TAG, "There no connection to server");
                 return;
-            }
-            else {
+            } else {
                 service = LinphoneService.instance();
             }
         }
@@ -436,14 +436,13 @@ public class IPCallManager {
         return result;
     }
 
-    public void cleanConfigs() {
-        if (mEntryActivity != null && LinphoneService.isReady()) {
+    public void cleanConfigs(Activity activity) {
+        if (activity != null && LinphoneService.isReady()) {
             if (!LinphoneManager.isAllowIncomingCall()) {
                 if (connection != null)
-                    mEntryActivity.unbindService(connection);
-                mEntryActivity.stopService(new Intent(mEntryActivity, LinphoneService.class));
-            }
-            else {
+                    activity.unbindService(connection);
+                activity.stopService(new Intent(activity, LinphoneService.class));
+            } else {
                 //Is allow incoming call (rtWork)
                 //Exit form ipcall user
                 LinphonePreferences prefs = LinphonePreferences.instance();
@@ -451,9 +450,9 @@ public class IPCallManager {
                 if (count > 0)
                     prefs.deleteAccount(count - 1); //Delete last account
 
-                if (Common.getUserInfo(mEntryActivity).getIpcall() == null) {
+                if (Common.getUserInfo(activity).getIpcall() == null) {
                     //No global ipcall user -> stop service
-                    mEntryActivity.stopService(new Intent(mEntryActivity, LinphoneService.class));
+                    activity.stopService(new Intent(activity, LinphoneService.class));
                 }
             }
             isRunning = false;

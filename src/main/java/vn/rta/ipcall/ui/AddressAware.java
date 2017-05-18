@@ -21,8 +21,7 @@ package vn.rta.ipcall.ui;
 
 /**
  * @author Genius Doan
- *
  */
 public interface AddressAware {
-	void setAddressWidget(AddressText address);
+    void setAddressWidget(AddressText address);
 }

@@ -83,7 +83,7 @@ public interface IOnCallActionTrigger {
     /**
      * Open the DTMF view
      */
-    int DTMF_DISPLAY = STOP_RECORDING +1;
+    int DTMF_DISPLAY = STOP_RECORDING + 1;
     /**
      * Start the video stream
      */

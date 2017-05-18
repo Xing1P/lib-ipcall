@@ -10,14 +10,12 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.support.design.widget.TabLayout;
 import android.support.v13.app.FragmentPagerAdapter;
-import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.view.ViewPager;
 import android.text.TextUtils;
@@ -43,6 +41,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.zxing.WriterException;
+import com.rta.ipcall.LinphoneManager;
+import com.rta.ipcall.LinphoneService;
 
 import org.matrix.androidsdk.MXSession;
 import org.matrix.androidsdk.data.MyUser;
@@ -96,38 +96,31 @@ import static vn.rta.cpms.communication.util.ResourceUtils.openResource;
 public class StaffInfoFragment extends Fragment
         implements /*CommunicationLoginHelper.MatrixSessionListener, */OnClickListener,
         OnMenuItemClickListener, CredentialManager.CredentialManagerListener {
-    private static final String TAG = StaffInfoFragment.class.getName();
     public static final String ITEM_MENU = StaffInfoFragment.class.getSimpleName() + ".ITEM_MENU";
     public static final String ITEM_POSITION = StaffInfoFragment.class.getSimpleName() + ".ITEM_POSITION";
-
-    private ImageView popupBtn, staffQACode;
-    private TextView staffInfo;
-    private TextView txtIPCallInfo;
-
-    private PopupMenu menu;
+    public static final int TAB_SYSTEM = 0;
+    public static final int TAB_PROCESS = 1;
+    public static final int TAB_HISTORY = 2;
+    private static final String TAG = StaffInfoFragment.class.getName();
     private static final int MENUITEM_CHANGEPASS = 0;
     private static final int MENUITEM_SYNC_STT = 1;
     private static final int MENUITEM_CONF_HOME_MENU = 2;
     private static final int MENUITEM_EXIT = 4;
     private static final int MENUITEM_SIGN_OUT = 3;
-
-    public static final int TAB_SYSTEM = 0;
-    public static final int TAB_PROCESS = 1;
-    public static final int TAB_HISTORY = 2;
-
-    private AvatarView mAvatarView;
-    private View mAvatarLoading;
-
-    private PhotoHandler mPhotoHandler;
-    private Uri mPhotoUri;
-
-    //private ViewGroup mDataSyncing;
-
-    private List<Fragment> mPagerData;
     protected SelectionsPagerAdapterAdapter mSelectionsPaperAdapter;
     protected ViewPager mViewPager;
     protected TabLayout mTabLayout;
+    private ImageView popupBtn, staffQACode;
+    private TextView staffInfo;
+    private TextView txtIPCallInfo;
+    private PopupMenu menu;
+    private AvatarView mAvatarView;
 
+    //private ViewGroup mDataSyncing;
+    private View mAvatarLoading;
+    private PhotoHandler mPhotoHandler;
+    private Uri mPhotoUri;
+    private List<Fragment> mPagerData;
     private View.OnTouchListener textviewTouchListener = new View.OnTouchListener() {
         private static final int MAX_CLICK_COUNT = 5;
         private static final int MIN_INTERVAL = 500;// millisecond
@@ -155,6 +148,11 @@ public class StaffInfoFragment extends Fragment
         }
 
     };
+
+    public static void stopAllTask() {
+        SystemInformationFragment.stopCheckStatus();
+        ProcessFragment.stopProcess();
+    }
 
     private PhotoHandler createPhotoHandler() {
         return new PhotoHandler(getActivity());
@@ -285,18 +283,17 @@ public class StaffInfoFragment extends Fragment
         return view;
     }
 
-
     public void setEnableIPCallStatus(boolean enabled) {
-        if (enabled)
-        {
-            Drawable d = ContextCompat.getDrawable(getActivity(), R.drawable.ic_phone_voip_enabled);
-            txtIPCallInfo.setCompoundDrawables(d, null, null, null);
-            txtIPCallInfo.setTextColor(Color.parseColor("#9E9E9E"));
+        if (!LinphoneManager.isAllowIncomingCall()) {
+            txtIPCallInfo.setVisibility(View.GONE);
+            return;
         }
-        else {
-            Drawable d = ContextCompat.getDrawable(getActivity(), R.drawable.ic_phone_voip);
-            txtIPCallInfo.setCompoundDrawables(d, null, null, null);
+        if (enabled) {
+            txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip_enabled, 0, 0, 0);
             txtIPCallInfo.setTextColor(Color.BLACK);
+        } else {
+            txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip, 0, 0, 0);
+            txtIPCallInfo.setTextColor(Color.parseColor("#9E9E9E"));
         }
     }
 
@@ -329,11 +326,6 @@ public class StaffInfoFragment extends Fragment
     private String getStaffCode() {
         UserInfo u = Common.getUserInfo(getActivity());
         return (u == null || u.getStaffCode() == null) ? "n/a" : u.getStaffCode();
-    }
-
-    public static void stopAllTask() {
-        SystemInformationFragment.stopCheckStatus();
-        ProcessFragment.stopProcess();
     }
 
     @Override
@@ -685,6 +677,22 @@ public class StaffInfoFragment extends Fragment
 
     }
 
+    @NeedsPermission(Manifest.permission.CAMERA)
+    void openCamera(Intent intent, int requestCode) {
+        startActivityForResult(intent, requestCode);
+    }
+
+    @OnPermissionDenied(Manifest.permission.CAMERA)
+    void showDeniedForCamera() {
+        MessageUtils.showToastInfo(getActivity(), R.string.cpms_permission_not_allowed);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        StaffInfoFragmentPermissionsDispatcher.onRequestPermissionsResult(this, requestCode, grantResults);
+    }
+
     private final class PhotoHandler extends PhotoSelectionHandler {
 
         private final PhotoListener mPhotoListener;
@@ -727,22 +735,6 @@ public class StaffInfoFragment extends Fragment
 
             }
         }
-    }
-
-    @NeedsPermission(Manifest.permission.CAMERA)
-    void openCamera(Intent intent, int requestCode) {
-        startActivityForResult(intent, requestCode);
-    }
-
-    @OnPermissionDenied(Manifest.permission.CAMERA)
-    void showDeniedForCamera() {
-        MessageUtils.showToastInfo(getActivity(), R.string.cpms_permission_not_allowed);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        StaffInfoFragmentPermissionsDispatcher.onRequestPermissionsResult(this, requestCode, grantResults);
     }
 
     public class SelectionsPagerAdapterAdapter extends FragmentPagerAdapter {

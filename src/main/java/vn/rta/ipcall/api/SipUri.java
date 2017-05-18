@@ -13,102 +13,21 @@ import java.util.regex.Pattern;
  */
 public final class SipUri {
 
-    private SipUri() {
-        // Singleton
-    }
-
     private final static String SIP_SCHEME_RULE = "sip(?:s)?|tel";
     private final static String DIGIT_NBR_RULE = "^[0-9\\-#\\+\\*\\(\\)]+$";
     private final static Pattern SIP_CONTACT_ADDRESS_PATTERN = Pattern
             .compile("^([^@:]+)@([^@]+)$");
     private final static Pattern SIP_CONTACT_PATTERN = Pattern
-            .compile("^(?:\")?([^<\"]*)(?:\")?[ ]*(?:<)?("+SIP_SCHEME_RULE+"):([^@]+)@([^>]+)(?:>)?$");
+            .compile("^(?:\")?([^<\"]*)(?:\")?[ ]*(?:<)?(" + SIP_SCHEME_RULE + "):([^@]+)@([^>]+)(?:>)?$");
     private final static Pattern SIP_HOST_PATTERN = Pattern
-            .compile("^(?:\")?([^<\"]*)(?:\")?[ ]*(?:<)?("+SIP_SCHEME_RULE+"):([^@>]+)(?:>)?$");
+            .compile("^(?:\")?([^<\"]*)(?:\")?[ ]*(?:<)?(" + SIP_SCHEME_RULE + "):([^@>]+)(?:>)?$");
+    private final static Pattern SIP_URI_PATTERN = Pattern.compile(
+            "^(sip(?:s)?):(?:[^:]*(?::[^@]*)?@)?([^:@]*)(?::([0-9]*))?$", Pattern.CASE_INSENSITIVE);
 
     // Contact related
-    /**
-     * Holder for parsed sip contact information.<br/>
-     * Basically wrap AoR.
-     * We should have something like "{@link ParsedSipContactInfos#displayName} <{@link ParsedSipContactInfos#scheme}:{@link ParsedSipContactInfos#userName}@{@link ParsedSipContactInfos#domain}>
-     */
-    public static class ParsedSipContactInfos {
-        /**
-         * Contact display name.
-         */
-        public String displayName = "";
-        /**
-         * User name of AoR
-         */
-        public String userName = "";
-        /**
-         * Domaine name
-         */
-        public String domain = "";
-        /**
-         * Scheme of the protocol
-         */
-        public String scheme = "";
 
-
-        @Override
-        public String toString() {
-            return toString(true);
-        }
-
-        public String toString(boolean includeDisplayName) {
-            StringBuffer buildString = new StringBuffer();
-            buildString.append("<");
-            buildString.append(getReadableSipUri());
-            buildString.append(">");
-
-            // Append display name at beggining if necessary
-            if (includeDisplayName && !TextUtils.isEmpty(displayName)) {
-                // Prepend with space
-                buildString.insert(0, " ");
-                // Start with display name
-                // qdtext         =  LWS / %x21 / %x23-5B / %x5D-7E  / UTF8-NONASCII
-                String encodedName = displayName.replace("\"", "%22");
-                encodedName = encodedName.replace("\\", "%5C");
-                buildString.insert(0, "\""+encodedName+"\" ");
-            }
-            return buildString.toString();
-        }
-
-        public String getReadableSipUri() {
-            StringBuffer buildString = new StringBuffer();
-            if(TextUtils.isEmpty(scheme)) {
-                buildString.append("sip:");
-            }else {
-                buildString.append(scheme + ":");
-            }
-            if(!TextUtils.isEmpty(userName)) {
-                buildString.append(encodeUser(userName) + "@");
-            }
-            buildString.append(domain);
-            return buildString.toString();
-        }
-
-        public String getContactAddress() {
-            StringBuffer buildString = new StringBuffer();
-
-            if(!TextUtils.isEmpty(userName)) {
-                buildString.append(encodeUser(userName) + "@");
-            }
-            buildString.append(domain);
-            return buildString.toString();
-        }
-
-        /**
-         * @return parsed sip server uri
-         */
-        public ParsedSipUriInfos getServerSipUri() {
-            String pScheme = scheme;
-            if(TextUtils.isEmpty(scheme)) {
-                pScheme = SipManager.PROTOCOL_SIP;
-            }
-            return parseSipUri(pScheme + ":" + domain);
-        }
+    private SipUri() {
+        // Singleton
     }
 
     /**
@@ -116,7 +35,7 @@ public final class SipUri {
      *
      * @param sipUri string sip contact
      * @return a ParsedSipContactInfos which contains uri parts. If not match
-     *         return the object with blank fields
+     * return the object with blank fields
      */
     public static ParsedSipContactInfos parseSipContact(String sipUri) {
         ParsedSipContactInfos parsedInfos = new ParsedSipContactInfos();
@@ -128,19 +47,19 @@ public final class SipUri {
                 parsedInfos.domain = m.group(4);
                 parsedInfos.userName = Uri.decode(m.group(3));
                 parsedInfos.scheme = m.group(2);
-            }else {
+            } else {
                 // Try to consider that as host
                 m = SIP_HOST_PATTERN.matcher(sipUri);
-                if(m.matches()) {
+                if (m.matches()) {
                     parsedInfos.displayName = Uri.decode(m.group(1).trim());
                     parsedInfos.domain = m.group(3);
                     parsedInfos.scheme = m.group(2);
-                }else {
+                } else {
                     m = SIP_CONTACT_ADDRESS_PATTERN.matcher(sipUri);
-                    if(m.matches()) {
+                    if (m.matches()) {
                         parsedInfos.userName = Uri.decode(m.group(1));
                         parsedInfos.domain = m.group(2);
-                    }else {
+                    } else {
                         // Final fallback, we have only a username given
                         parsedInfos.userName = sipUri;
                     }
@@ -193,12 +112,12 @@ public final class SipUri {
      * @return null if no phone number detected. The phone number else.
      */
     public static String getPhoneNumber(ParsedSipContactInfos uriInfos) {
-        if(uriInfos == null) {
+        if (uriInfos == null) {
             return null;
         }
-        if(isPhoneNumber(uriInfos.userName)) {
+        if (isPhoneNumber(uriInfos.userName)) {
             return uriInfos.userName;
-        }else if(isPhoneNumber(uriInfos.displayName)) {
+        } else if (isPhoneNumber(uriInfos.displayName)) {
             return uriInfos.displayName;
         }
         return null;
@@ -221,11 +140,11 @@ public final class SipUri {
      * Transform sip uri into something that doesn't depend on remote display
      * name
      *
-     * @param sipContact full sip uri
+     * @param sipContact    full sip uri
      * @param includeScheme whether to include scheme in case of username
      * @return the canonical sip contact <br/>
-     *         Example sip:user@domain.com <br/>
-     *         or user@domain.com (if include scheme is false)
+     * Example sip:user@domain.com <br/>
+     * or user@domain.com (if include scheme is false)
      */
     public static String getCanonicalSipContact(String sipContact, boolean includeScheme) {
         StringBuilder sb = new StringBuilder();
@@ -253,12 +172,12 @@ public final class SipUri {
                 }
             } else {
                 m = SIP_CONTACT_ADDRESS_PATTERN.matcher(sipContact);
-                if(m.matches()) {
-                    if(includeScheme) {
+                if (m.matches()) {
+                    if (includeScheme) {
                         sb.append("sip:");
                     }
                     sb.append(sipContact);
-                }else {
+                } else {
                     sb.append(sipContact);
                 }
             }
@@ -268,27 +187,6 @@ public final class SipUri {
     }
 
     // Uri related
-    /**
-     * Holder for parsed sip uri information.<br/>
-     * We should have something like "{@link ParsedSipUriInfos#scheme}:{@link ParsedSipUriInfos#domain}:{@link ParsedSipUriInfos#port}"
-     */
-    public static class ParsedSipUriInfos {
-        /**
-         * Domain name/ip
-         */
-        public String domain = "";
-        /**
-         * Scheme of the protocol
-         */
-        public String scheme = SipManager.PROTOCOL_SIP;
-        /**
-         * Port number
-         */
-        public int port = 5060;
-    }
-
-    private final static Pattern SIP_URI_PATTERN = Pattern.compile(
-            "^(sip(?:s)?):(?:[^:]*(?::[^@]*)?@)?([^:@]*)(?::([0-9]*))?$", Pattern.CASE_INSENSITIVE);
 
     /**
      * Parse an uri
@@ -327,6 +225,109 @@ public final class SipUri {
         //unreserved  =  alphanum / mark
         //mark        =  "-" / "_" / "." / "!" / "~" / "*" / "'" / "(" / ")"
         return Uri.encode(user, "&=+$,;?/-_.!~*'()");
+    }
+
+    /**
+     * Holder for parsed sip contact information.<br/>
+     * Basically wrap AoR.
+     * We should have something like "{@link ParsedSipContactInfos#displayName} <{@link ParsedSipContactInfos#scheme}:{@link ParsedSipContactInfos#userName}@{@link ParsedSipContactInfos#domain}>
+     */
+    public static class ParsedSipContactInfos {
+        /**
+         * Contact display name.
+         */
+        public String displayName = "";
+        /**
+         * User name of AoR
+         */
+        public String userName = "";
+        /**
+         * Domaine name
+         */
+        public String domain = "";
+        /**
+         * Scheme of the protocol
+         */
+        public String scheme = "";
+
+
+        @Override
+        public String toString() {
+            return toString(true);
+        }
+
+        public String toString(boolean includeDisplayName) {
+            StringBuffer buildString = new StringBuffer();
+            buildString.append("<");
+            buildString.append(getReadableSipUri());
+            buildString.append(">");
+
+            // Append display name at beggining if necessary
+            if (includeDisplayName && !TextUtils.isEmpty(displayName)) {
+                // Prepend with space
+                buildString.insert(0, " ");
+                // Start with display name
+                // qdtext         =  LWS / %x21 / %x23-5B / %x5D-7E  / UTF8-NONASCII
+                String encodedName = displayName.replace("\"", "%22");
+                encodedName = encodedName.replace("\\", "%5C");
+                buildString.insert(0, "\"" + encodedName + "\" ");
+            }
+            return buildString.toString();
+        }
+
+        public String getReadableSipUri() {
+            StringBuffer buildString = new StringBuffer();
+            if (TextUtils.isEmpty(scheme)) {
+                buildString.append("sip:");
+            } else {
+                buildString.append(scheme + ":");
+            }
+            if (!TextUtils.isEmpty(userName)) {
+                buildString.append(encodeUser(userName) + "@");
+            }
+            buildString.append(domain);
+            return buildString.toString();
+        }
+
+        public String getContactAddress() {
+            StringBuffer buildString = new StringBuffer();
+
+            if (!TextUtils.isEmpty(userName)) {
+                buildString.append(encodeUser(userName) + "@");
+            }
+            buildString.append(domain);
+            return buildString.toString();
+        }
+
+        /**
+         * @return parsed sip server uri
+         */
+        public ParsedSipUriInfos getServerSipUri() {
+            String pScheme = scheme;
+            if (TextUtils.isEmpty(scheme)) {
+                pScheme = SipManager.PROTOCOL_SIP;
+            }
+            return parseSipUri(pScheme + ":" + domain);
+        }
+    }
+
+    /**
+     * Holder for parsed sip uri information.<br/>
+     * We should have something like "{@link ParsedSipUriInfos#scheme}:{@link ParsedSipUriInfos#domain}:{@link ParsedSipUriInfos#port}"
+     */
+    public static class ParsedSipUriInfos {
+        /**
+         * Domain name/ip
+         */
+        public String domain = "";
+        /**
+         * Scheme of the protocol
+         */
+        public String scheme = SipManager.PROTOCOL_SIP;
+        /**
+         * Port number
+         */
+        public int port = 5060;
     }
 
 }

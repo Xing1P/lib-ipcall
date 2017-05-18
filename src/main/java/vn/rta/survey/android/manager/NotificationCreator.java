@@ -21,7 +21,7 @@ public class NotificationCreator {
     private static RemoteViews contentView;
 
     public static Notification getNotification(Context context) {
-        if(notification == null) {
+        if (notification == null) {
             notification = new NotificationCompat.Builder(context)
                     .setContentTitle(notifTitle)
                     .setContentText(notifText)
@@ -33,8 +33,7 @@ public class NotificationCreator {
         return notification;
     }
 
-    public static void setNotificationTitle(String title)
-    {
+    public static void setNotificationTitle(String title) {
         notifTitle = title;
     }
 
@@ -42,8 +41,7 @@ public class NotificationCreator {
         notifText = text;
     }
 
-    public static void setContentView(RemoteViews view)
-    {
+    public static void setContentView(RemoteViews view) {
         contentView = view;
     }
 

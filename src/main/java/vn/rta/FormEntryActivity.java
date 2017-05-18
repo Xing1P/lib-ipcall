@@ -22,6 +22,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -140,6 +141,7 @@ import org.odk.collect.android.widgets.QuestionWidget;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
@@ -1531,14 +1533,14 @@ public class FormEntryActivity extends CommonActivity implements
         switch (requestCode) {
             case REQUEST_ENABLE_BT:
                 if (resultCode == Activity.RESULT_OK) {
-                    Toast.makeText(this, "Bluetooth open successful", Toast.LENGTH_LONG).show();
+                    Intent serverIntent = new Intent(this, DeviceListActivity.class);
+                    startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
                 } else {
                     return;
                 }
                 break;
             case REQUEST_CONNECT_DEVICE:
                 if (resultCode == Activity.RESULT_OK) {
-                    Toast.makeText(this, "Bluetooth open successful", Toast.LENGTH_SHORT).show();
                     String address = intent.getExtras()
                             .getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
                     if (bluetoothService != null && bluetoothService.isAvailable()) {
@@ -2715,7 +2717,9 @@ public class FormEntryActivity extends CommonActivity implements
                     }
                     return true;
                 }
-
+                else {
+                    Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
+                }
             } catch (JavaRosaException e) {
                 e.printStackTrace();
                 return false;
@@ -2794,22 +2798,31 @@ public class FormEntryActivity extends CommonActivity implements
 
     @Override
     public void removeAnswer(int id) {
-        for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
-            if (id == qw.getId()) {
-                ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
-                clearAnswerAndBind(qw, ((RTAView) mCurrentView).getWidgets());
-                break;
+        if (mCurrentView instanceof RTAView) {
+            for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
+                if (id == qw.getId()) {
+                    ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
+                    clearAnswerAndBind(qw, ((RTAView) mCurrentView).getWidgets());
+                    break;
+                }
             }
+        }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
     }
 
     public void removeAnswerWithConfirmDialog(int id) {
-        for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
-            if (id == qw.getId()) {
-                ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
-                createClearDialog(qw);
-                break;
+        if (mCurrentView instanceof RTAView) {
+            for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
+                if (id == qw.getId()) {
+                    ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
+                    createClearDialog(qw);
+                    break;
+                }
             }
+        } else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
     }
 
@@ -2864,13 +2877,19 @@ public class FormEntryActivity extends CommonActivity implements
 		 * clicked on.
 		 */
 
-        for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
-            if (item.getItemId() == qw.getId()) {
-                ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
-                createClearDialog(qw);
-                break;
+        if (mCurrentView instanceof RTAView) {
+            for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
+                if (item.getItemId() == qw.getId()) {
+                    ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
+                    createClearDialog(qw);
+                    break;
+                }
             }
         }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
+        }
+
         if (item.getItemId() == DELETE_REPEAT) {
             createDeleteRepeatConfirmDialog(formIndexClear);
             ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_DELETE_REPEAT_DIALOG, "");
@@ -3931,10 +3950,15 @@ public class FormEntryActivity extends CommonActivity implements
     }
 
     public void resetQuestion() {
-        List<QuestionWidget> qt = ((RTAView) mCurrentView).getWidgets();
+        if (mCurrentView instanceof RTAView) {
+            List<QuestionWidget> qt = ((RTAView) mCurrentView).getWidgets();
 
-        for (int i = 0; i < qt.size(); i++) {
-            qt.get(i).setRefesh();
+            for (int i = 0; i < qt.size(); i++) {
+                qt.get(i).setRefesh();
+            }
+        }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
     }
 
@@ -5298,7 +5322,8 @@ public class FormEntryActivity extends CommonActivity implements
 
         for (int i = 1; i <= languages.length; i++) {
             final RadioButton rdbtn = new RadioButton(this);
-            rdbtn.setText("Language" + i);
+            rdbtn.setText(languages[i - 1]);
+            rdbtn.setTextColor(Color.BLACK);
             if (selected == i - 1) {
                 rdbtn.setChecked(true);
             }
@@ -5509,6 +5534,9 @@ public class FormEntryActivity extends CommonActivity implements
                 }
             }
         }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
+        }
 
         if (mFormController != null)
             QACheckPointImp.getInstance(mFormController.getUuid()).release();
@@ -5555,6 +5583,9 @@ public class FormEntryActivity extends CommonActivity implements
             if (v != null) {
                 v.clearFocus();
             }
+        }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
         /*
         cleanConfigs(new Intent(this, InIpCallService.class));
@@ -5743,7 +5774,7 @@ public class FormEntryActivity extends CommonActivity implements
     }
 
     private void cleanConfigs() {
-        IPCallManager.getInstance().cleanConfigs();
+        IPCallManager.getInstance().cleanConfigs(this);
         if (TraceLocationService.isRunning()) {
             stopService(new Intent(this, TraceLocationService.class));
         }
@@ -5791,6 +5822,9 @@ public class FormEntryActivity extends CommonActivity implements
 
         if (mCurrentView instanceof RTAView) {
             ((RTAView) mCurrentView).setFocus(this);
+        }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
         mBeenSwiped = false;
     }
@@ -6778,6 +6812,9 @@ public class FormEntryActivity extends CommonActivity implements
                     return false;
                 }
             }
+            else {
+                Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
+            }
 
             if (mBeenSwiped) {
                 return false;
@@ -7382,6 +7419,9 @@ public class FormEntryActivity extends CommonActivity implements
         if (mCurrentView instanceof RTAView) {
             ((RTAView) mCurrentView).setEnabled(isEnable);
         }
+        else {
+            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
+        }
     }
 
     @Override
@@ -7737,11 +7777,6 @@ public class FormEntryActivity extends CommonActivity implements
         }
     }
 
-
-
-
-
-
     @Override
     public void connectBluetoothDevice(Handler handler) {
         if (bluetoothService != null) {
@@ -7749,23 +7784,31 @@ public class FormEntryActivity extends CommonActivity implements
             bluetoothService = null;
         }
         bluetoothService = new BluetoothService(this, handler);
-
-        Intent serverIntent = new Intent(this, DeviceListActivity.class);
-        startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+        if (!bluetoothService.isBTopen()) {
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
+        } else {
+            Intent serverIntent = new Intent(this, DeviceListActivity.class);
+            startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+        }
     }
 
     @Override
     public void writeDataToBlueToothDevice(byte[] data) {
         if (bluetoothService != null && bluetoothService.isAvailable()) {
             bluetoothService.write(data);
-            bluetoothService.sendMessage("\n", "UTF-8");
         }
     }
 
     @Override
     public void writeRawMessageToBlueToothDevice(String message, String charset) {
-        if (message != null && bluetoothService != null && bluetoothService.isAvailable()) {
-            bluetoothService.sendMessage(message, charset);
+        if (message != null && message.length() > 0 && bluetoothService != null && bluetoothService.isAvailable()) {
+            try {
+                bluetoothService.write(message.getBytes(charset));
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                bluetoothService.write(message.getBytes());
+            }
         }
     }
 }

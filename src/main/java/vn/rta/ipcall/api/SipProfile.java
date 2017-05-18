@@ -24,25 +24,24 @@ import java.util.regex.Pattern;
  */
 
 public class SipProfile implements Parcelable {
-    private static final String THIS_FILE = "SipProfile";
-
-    // Constants
     /**
      * Constant for an invalid account id.
      */
     public final static long INVALID_ID = -1;
 
-    // Transport choices
+    // Constants
     /**
      * Automatically choose transport.<br/>
      * By default it uses UDP, if packet is higher than UDP limit it will switch
      * to TCP.<br/>
      * Take care with that , because not all sip servers support udp/tcp
      * correclty.
-     *
+     * <p>
      * GeniusDoan: currently Linphone not supported
      */
     public final static int TRANSPORT_AUTO = -1;
+
+    // Transport choices
     /**
      * Force UDP transport.
      */
@@ -55,20 +54,18 @@ public class SipProfile implements Parcelable {
      * Force TLS transport.
      */
     public final static int TRANSPORT_TLS = 2;
-
-    // Stack choices
     /**
      * Use pjsip as backend.<br/>
      * For now it's the only one supported
      */
     public static final int PJSIP_STACK = 0;
+
+    // Stack choices
     /**
      * @deprecated Use google google android 2.3 backend.<br/>
-     *             This is not supported for now.
+     * This is not supported for now.
      */
     public static final int GOOGLE_STACK = 1;
-
-    // Password type choices
     /**
      * Plain password mode.<br/>
      * <a target="_blank" href=
@@ -78,6 +75,8 @@ public class SipProfile implements Parcelable {
      * @see #datatype
      */
     public static final int CRED_DATA_PLAIN_PASSWD = 0;
+
+    // Password type choices
     /**
      * Digest mode.<br/>
      * <a target="_blank" href=
@@ -88,15 +87,13 @@ public class SipProfile implements Parcelable {
      */
     public static final int CRED_DATA_DIGEST = 1;
     /**
-     * @deprecated This mode is not supported by linphone for now.<br/>
-     *             <a target="_blank" href=
-     *             "http://www.pjsip.org/pjsip/docs/html/structpjsip__cred__info.htm#a8b1e563c814bdf8012f0bdf966d0ad9d"
-     *             >Pjsip documentation</a>
      * @see #datatype
+     * @deprecated This mode is not supported by linphone for now.<br/>
+     * <a target="_blank" href=
+     * "http://www.pjsip.org/pjsip/docs/html/structpjsip__cred__info.htm#a8b1e563c814bdf8012f0bdf966d0ad9d"
+     * >Pjsip documentation</a>
      */
     public static final int CRED_CRED_DATA_EXT_AKA = 2;
-
-    // Scheme credentials choices
     /**
      * Digest scheme for credentials.<br/>
      * <a target="_blank" href=
@@ -106,6 +103,8 @@ public class SipProfile implements Parcelable {
      * @see #scheme
      */
     public static final String CRED_SCHEME_DIGEST = "Digest";
+
+    // Scheme credentials choices
     /**
      * PGP scheme for credentials.<br/>
      * <a target="_blank" href=
@@ -115,7 +114,6 @@ public class SipProfile implements Parcelable {
      * @see #scheme
      */
     public static final String CRED_SCHEME_PGP = "PGP";
-
     /**
      * Separator for proxy field once stored in database.<br/>
      * It's the pipe char.
@@ -123,12 +121,12 @@ public class SipProfile implements Parcelable {
      * @see #FIELD_PROXY
      */
     public static final String PROXIES_SEPARATOR = "|";
-
-    // Content Provider - account
     /**
      * Table name of content provider for accounts storage
      */
     public final static String ACCOUNTS_TABLE_NAME = "accounts";
+
+    // Content Provider - account
     /**
      * Content type for account / sip profile
      */
@@ -150,13 +148,13 @@ public class SipProfile implements Parcelable {
      */
     public final static Uri ACCOUNT_ID_URI_BASE = Uri.parse(ContentResolver.SCHEME_CONTENT + "://"
             + SipManager.AUTHORITY + "/" + ACCOUNTS_TABLE_NAME + "/");
-
-    // Content Provider - account status
     /**
      * Virutal table name for sip profile adding/registration table.<br/>
      * An application should use it in read only mode.
      */
     public final static String ACCOUNTS_STATUS_TABLE_NAME = "accounts_status";
+
+    // Content Provider - account status
     /**
      * Content type for sip profile adding/registration state
      */
@@ -181,14 +179,14 @@ public class SipProfile implements Parcelable {
     public final static Uri ACCOUNT_STATUS_ID_URI_BASE = Uri.parse(ContentResolver.SCHEME_CONTENT
             + "://"
             + SipManager.AUTHORITY + "/" + ACCOUNTS_STATUS_TABLE_NAME + "/");
-
-    // Fields for table accounts
     /**
      * Primary key identifier of the account in the database.
      *
      * @see Long
      */
     public static final String FIELD_ID = "id";
+
+    // Fields for table accounts
     /**
      * Activation state of the account.<br/>
      * If false this account will be ignored by the sip stack.
@@ -232,7 +230,6 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_ACC_ID = "acc_id";
-
     /**
      * Data useful for the wizard internal use.
      * The format here is specific to the wizard and no assumption is made.
@@ -241,7 +238,6 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_WIZARD_DATA = "wizard_data";
-
     /**
      * This is the URL to be put in the request URI for the registration, and
      * will look something like "sip:serviceprovider".<br/>
@@ -329,7 +325,6 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_FORCE_CONTACT = "force_contact";
-
     /**
      * This option is used to update the transport address and the Contact
      * header of REGISTER request.<br/>
@@ -369,7 +364,6 @@ public class SipProfile implements Parcelable {
      * @see Integer
      */
     public static final String FIELD_CONTACT_REWRITE_METHOD = "contact_rewrite_method";
-
     /**
      * Additional parameters that will be appended in the Contact header for
      * this account.<br/>
@@ -401,7 +395,7 @@ public class SipProfile implements Parcelable {
     public static final String FIELD_TRANSPORT = "transport";
     /**
      * Default scheme to automatically add for this account when calling without uri scheme.<br/>
-     *
+     * <p>
      * This is free field but should be one of :
      * sip, sips, tel
      * If invalid (or empty) will automatically fallback to sip
@@ -425,7 +419,6 @@ public class SipProfile implements Parcelable {
      * @see Integer
      */
     public static final String FIELD_USE_ZRTP = "use_zrtp";
-
     /**
      * Optional URI of the proxies to be visited for all outgoing requests that
      * are using this account (REGISTER, INVITE, etc).<br/>
@@ -450,8 +443,6 @@ public class SipProfile implements Parcelable {
      * @see Integer
      */
     public static final String FIELD_REG_USE_PROXY = "reg_use_proxy";
-
-    // For now, assume unique credential
     /**
      * Realm to filter on for credentials.<br/>
      * Put star "*" char if you want it to match all requests.<br/>
@@ -462,6 +453,8 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_REALM = "realm";
+
+    // For now, assume unique credential
     /**
      * Scheme (e.g. "digest").<br/>
      * <a target="_blank" href=
@@ -511,28 +504,24 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_DATA = "data";
-
     /**
      * If this flag is set, the authentication client framework will send an empty Authorization header in each initial request. Default is no.
-     *  <a target="_blank" href=
+     * <a target="_blank" href=
      * "http://www.pjsip.org/docs/latest/pjsip/docs/html/structpjsip__auth__clt__pref.htm#ac3487e53d8d6b3ea392315b08e2aac4a"
      * >Pjsip documentation</a>
      *
      * @see Integer
      */
     public static final String FIELD_AUTH_INITIAL_AUTH = "initial_auth";
-
     /**
      * If this flag is set, the authentication client framework will send an empty Authorization header in each initial request. Default is no.
-     *  <a target="_blank" href=
+     * <a target="_blank" href=
      * "http://www.pjsip.org/docs/latest/pjsip/docs/html/structpjsip__auth__clt__pref.htm#ac3487e53d8d6b3ea392315b08e2aac4a"
      * >Pjsip documentation</a>
      *
      * @see Integer
      */
     public static final String FIELD_AUTH_ALGO = "auth_algo";
-
-    // Android stuff
     /**
      * The backend sip stack to use for this account.<br/>
      * For now only pjsip backend is supported.
@@ -542,6 +531,8 @@ public class SipProfile implements Parcelable {
      * @see #GOOGLE_STACK
      */
     public static final String FIELD_SIP_STACK = "sip_stack";
+
+    // Android stuff
     /**
      * Sip contact to call if user want to consult his voice mail.<br/>
      *
@@ -557,8 +548,6 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_ANDROID_GROUP = "android_group";
-
-    // Sip outbound
     /**
      * Control the use of SIP outbound feature. <br/>
      * <a target="_blank" href=
@@ -568,6 +557,8 @@ public class SipProfile implements Parcelable {
      * @see Integer
      */
     public static final String FIELD_USE_RFC5626 = "use_rfc5626";
+
+    // Sip outbound
     /**
      * Specify SIP outbound (RFC 5626) instance ID to be used by this
      * application.<br/>
@@ -587,20 +578,18 @@ public class SipProfile implements Parcelable {
      * @see String
      */
     public static final String FIELD_RFC5626_REG_ID = "rfc5626_reg_id";
-
-    // Video config
     /**
      * Auto show video of the remote party.<br/>
      * TODO : complete when pjsip-2.x stable documentation out
      */
     public static final String FIELD_VID_IN_AUTO_SHOW = "vid_in_auto_show";
+
+    // Video config
     /**
      * Auto transmit video of our party.<br/>
      * TODO : complete when pjsip-2.x stable documentation out
      */
     public static final String FIELD_VID_OUT_AUTO_TRANSMIT = "vid_out_auto_transmit";
-
-    // RTP config
     /**
      * Begin RTP port for the media of this account.<br/>
      * By default it will use {@link SipConfigManager#RTP_PORT}
@@ -608,6 +597,8 @@ public class SipProfile implements Parcelable {
      * @see Integer
      */
     public static final String FIELD_RTP_PORT = "rtp_port";
+
+    // RTP config
     /**
      * Public address to announce in SDP as self media address.<br/>
      * Only use if you have static and known public ip on your device regarding
@@ -640,7 +631,6 @@ public class SipProfile implements Parcelable {
      * @see SipConfigManager#DSCP_VAL
      */
     public static final String FIELD_RTP_QOS_DSCP = "rtp_qos_dscp";
-
     /**
      * Should the application try to clean registration of all sip clients if no
      * registration found.<br/>
@@ -653,14 +643,12 @@ public class SipProfile implements Parcelable {
      * @see Boolean
      */
     public static final String FIELD_TRY_CLEAN_REGISTERS = "try_clean_reg";
-
-
     /**
      * This option is used to overwrite the "sent-by" field of the Via header
      * for outgoing messages with the same interface address as the one in
      * the REGISTER request, as long as the request uses the same transport
      * instance as the previous REGISTER request. <br/>
-     *
+     * <p>
      * Default: false <br/>
      * <a target="_blank" href=
      * "http://www.pjsip.org/pjsip/docs/html/structpjsua__acc__config.htm"
@@ -669,7 +657,6 @@ public class SipProfile implements Parcelable {
      * @see Boolean
      */
     public static final String FIELD_ALLOW_VIA_REWRITE = "allow_via_rewrite";
-
     /**
      * This option controls whether the IP address in SDP should be replaced
      * with the IP address found in Via header of the REGISTER response, ONLY
@@ -677,65 +664,54 @@ public class SipProfile implements Parcelable {
      * behavior), then the local IP address will be used. If TRUE, and when
      * STUN and ICE are disabled, then the IP address found in registration
      * response will be used.
-     *
+     * <p>
      * Default:no
      *
      * @see Boolean
      */
     public static final String FIELD_ALLOW_SDP_NAT_REWRITE = "allow_sdp_nat_rewrite";
-
     /**
      * Control the use of STUN for the SIP signaling.
      */
     public static final String FIELD_SIP_STUN_USE = "sip_stun_use";
-
     /**
      * Control the use of STUN for the transports.
      */
     public static final String FIELD_MEDIA_STUN_USE = "media_stun_use";
-
     /**
      * Control the use of ICE in the account.
      * By default, the settings in the pjsua_media_config will be used.
      */
     public static final String FIELD_ICE_CFG_USE = "ice_cfg_use";
-
     /**
      * Enable ICE.
      */
     public static final String FIELD_ICE_CFG_ENABLE = "ice_cfg_enable";
-
     /**
      * Control the use of TURN in the account.
      * By default, the settings in the pjsua_media_config will be used.
      */
     public static final String FIELD_TURN_CFG_USE = "turn_cfg_use";
-
     /**
-     *  Enable TURN.
+     * Enable TURN.
      */
     public static final String FIELD_TURN_CFG_ENABLE = "turn_cfg_enable";
-
     /**
-     *  TURN server.
+     * TURN server.
      */
     public static final String FIELD_TURN_CFG_SERVER = "turn_cfg_server";
-
     /**
-     *  TURN username.
+     * TURN username.
      */
     public static final String FIELD_TURN_CFG_USER = "turn_cfg_user";
-
     /**
-     *  TURN password.
+     * TURN password.
      */
     public static final String FIELD_TURN_CFG_PASSWORD = "turn_cfg_pwd";
-
     /**
      * Should media use ipv6?
      */
     public static final String FIELD_IPV6_MEDIA_USE = "ipv6_media_use";
-
     /**
      * Simple project to use if you want to list accounts with basic infos on it
      * only.
@@ -748,7 +724,7 @@ public class SipProfile implements Parcelable {
      * @see #FIELD_PRIORITY
      * @see #FIELD_REG_URI
      */
-    public static final String[] LISTABLE_PROJECTION = new String[] {
+    public static final String[] LISTABLE_PROJECTION = new String[]{
             SipProfile.FIELD_ID,
             SipProfile.FIELD_ACC_ID,
             SipProfile.FIELD_ACTIVE,
@@ -757,8 +733,22 @@ public class SipProfile implements Parcelable {
             SipProfile.FIELD_PRIORITY,
             SipProfile.FIELD_REG_URI
     };
+    /**
+     * Parcelable creator. So that it can be passed as an argument of the aidl
+     * interface
+     */
+    public static final Parcelable.Creator<SipProfile> CREATOR = new Parcelable.Creator<SipProfile>() {
+        public SipProfile createFromParcel(Parcel in) {
+            return new SipProfile(in);
+        }
+
+        public SipProfile[] newArray(int size) {
+            return new SipProfile[size];
+        }
+    };
 
     // Properties
+    private static final String THIS_FILE = "SipProfile";
     /**
      * Primary key for serialization of the object.
      */
@@ -782,7 +772,7 @@ public class SipProfile implements Parcelable {
     /**
      * @see #FIELD_DEFAULT_URI_SCHEME
      */
-    public String default_uri_scheme  = "sip";
+    public String default_uri_scheme = "sip";
     /**
      * @see #FIELD_ACTIVE
      */
@@ -795,7 +785,6 @@ public class SipProfile implements Parcelable {
      * @see #FIELD_ACC_ID
      */
     public String acc_id = null;
-
     /**
      * @see #FIELD_REG_URI
      */
@@ -869,7 +858,7 @@ public class SipProfile implements Parcelable {
     /**
      * @see #FIELD_AUTH_ALGO
      */
-    public String  auth_algo = "";
+    public String auth_algo = "";
     /**
      * @see #FIELD_USE_SRTP
      */
@@ -1082,18 +1071,91 @@ public class SipProfile implements Parcelable {
     }
 
     /**
-     * Parcelable creator. So that it can be passed as an argument of the aidl
-     * interface
+     * Helper method to retrieve a SipProfile object from its account database
+     * id.<br/>
+     * You have to specify the projection you want to use for to retrieve infos.<br/>
+     * As consequence the wrapper SipProfile object you'll get may be
+     * incomplete. So take care if you try to reinject it by updating to not
+     * override existing values of the database that you don't get here.
+     *
+     * @param ctxt       Your application context. Mainly useful to get the content provider for the request.
+     * @param accountId  The sip profile {@link #FIELD_ID} you want to retrieve.
+     * @param projection The list of fields you want to retrieve. Must be in FIELD_* of this class.<br/>
+     *                   Reducing your requested fields to minimum will improve speed of the request.
+     * @return A wrapper SipProfile object on the request you done. If not found an invalid account with an {@link #id} equals to {@link #INVALID_ID}
      */
-    public static final Parcelable.Creator<SipProfile> CREATOR = new Parcelable.Creator<SipProfile>() {
-        public SipProfile createFromParcel(Parcel in) {
-            return new SipProfile(in);
+    public static SipProfile getProfileFromDbId(Context ctxt, long accountId, String[] projection) {
+        SipProfile account = new SipProfile();
+        if (accountId != INVALID_ID) {
+            Cursor c = ctxt.getContentResolver().query(
+                    ContentUris.withAppendedId(ACCOUNT_ID_URI_BASE, accountId),
+                    projection, null, null, null);
+
+            if (c != null) {
+                try {
+                    if (c.getCount() > 0) {
+                        c.moveToFirst();
+                        account = new SipProfile(c);
+                    }
+                } catch (Exception e) {
+                    Log.e(THIS_FILE, "Something went wrong while retrieving the account", e);
+                } finally {
+                    c.close();
+                }
+            }
+        }
+        return account;
+    }
+
+    /**
+     * Get the list of sip profiles available.
+     *
+     * @param ctxt       Your application context. Mainly useful to get the content provider for the request.
+     * @param onlyActive Pass it to true if you are only interested in active accounts.
+     * @return The list of SipProfiles containings only fields of {@link #LISTABLE_PROJECTION} filled.
+     * @see #LISTABLE_PROJECTION
+     */
+    public static ArrayList<SipProfile> getAllProfiles(Context ctxt, boolean onlyActive) {
+        return getAllProfiles(ctxt, onlyActive, LISTABLE_PROJECTION);
+    }
+
+    /**
+     * Get the list of sip profiles available.
+     *
+     * @param ctxt       Your application context. Mainly useful to get the content provider for the request.
+     * @param onlyActive Pass it to true if you are only interested in active accounts.
+     * @param projection The projection to use for cursor
+     * @return The list of SipProfiles
+     */
+    public static ArrayList<SipProfile> getAllProfiles(Context ctxt, boolean onlyActive, String[] projection) {
+        ArrayList<SipProfile> result = new ArrayList<SipProfile>();
+
+        String selection = null;
+        String[] selectionArgs = null;
+        if (onlyActive) {
+            selection = SipProfile.FIELD_ACTIVE + "=?";
+            selectionArgs = new String[]{
+                    "1"
+            };
+        }
+        Cursor c = ctxt.getContentResolver().query(ACCOUNT_URI, projection, selection, selectionArgs, null);
+
+        if (c != null) {
+            try {
+                if (c.moveToFirst()) {
+                    do {
+                        result.add(new SipProfile(c));
+                    } while (c.moveToNext());
+                }
+            } catch (Exception e) {
+                Log.e(THIS_FILE, "Error on looping over sip profiles", e);
+            } finally {
+                c.close();
+            }
         }
 
-        public SipProfile[] newArray(int size) {
-            return new SipProfile[size];
-        }
-    };
+        return result;
+    }
 
     /**
      * @see Parcelable#describeContents()
@@ -1180,6 +1242,8 @@ public class SipProfile implements Parcelable {
     private String getReadParcelableString(String str) {
         return str.equalsIgnoreCase("null") ? null : str;
     }
+
+    // Android API
 
     /**
      * Create account wrapper with cursor datas.
@@ -1348,7 +1412,7 @@ public class SipProfile implements Parcelable {
             sip_stack = tmp_i;
         }
         tmp_i = args.getAsInteger(FIELD_MWI_ENABLED);
-        if(tmp_i != null && tmp_i >= 0) {
+        if (tmp_i != null && tmp_i >= 0) {
             mwi_enabled = (tmp_i == 1);
         }
         tmp_s = args.getAsString(FIELD_VOICE_MAIL_NBR);
@@ -1459,7 +1523,7 @@ public class SipProfile implements Parcelable {
      * using this utility method.
      *
      * @return Complete content values from the current wrapper around sip
-     *         profile.
+     * profile.
      */
     public ContentValues getDbContentValues() {
         ContentValues args = new ContentValues();
@@ -1478,7 +1542,7 @@ public class SipProfile implements Parcelable {
 //        Log.d("test dbcontent ","FIELD_WIZARD " + wizard);
 
         args.put(FIELD_DISPLAY_NAME, display_name);
-        Log.d("test dbcontent ","FIELD_DISPLAY_NAME " + display_name);
+        Log.d("test dbcontent ", "FIELD_DISPLAY_NAME " + display_name);
 
         args.put(FIELD_TRANSPORT, transport.toInt());
 //        Log.d("test dbcontent ","FIELD_TRANSPORT " + transport);
@@ -1542,12 +1606,12 @@ public class SipProfile implements Parcelable {
 ///        Log.d("test dbcontent ","FIELD_DATATYPE " + datatype);
         if (!TextUtils.isEmpty(data)) {
             args.put(FIELD_DATA, data);
-            Log.d("test dbcontent ","FIELD_DATA " + data);
+            Log.d("test dbcontent ", "FIELD_DATA " + data);
         }
         args.put(FIELD_AUTH_INITIAL_AUTH, initial_auth ? 1 : 0);
-        if(!TextUtils.isEmpty(auth_algo)) {
+        if (!TextUtils.isEmpty(auth_algo)) {
             args.put(FIELD_AUTH_ALGO, auth_algo);
-            Log.d("test dbcontent ","FIELD_AUTH_ALGO " + auth_algo);
+            Log.d("test dbcontent ", "FIELD_AUTH_ALGO " + auth_algo);
         }
 
         args.put(FIELD_SIP_STACK, sip_stack);
@@ -1613,8 +1677,6 @@ public class SipProfile implements Parcelable {
         return args;
     }
 
-    // Android API
-
     /**
      * Gets the flag of 'Auto Registration'
      *
@@ -1624,16 +1686,18 @@ public class SipProfile implements Parcelable {
         return true;
     }
 
-
     /**
      * Gets the password.
      *
      * @return the password of the sip profile Using this from an external
-     *         application will always be empty
+     * application will always be empty
      */
     public String getPassword() {
         return data;
     }
+
+
+    // Helpers static factory
 
     /**
      * Gets the (user-defined) name of the profile.
@@ -1661,93 +1725,6 @@ public class SipProfile implements Parcelable {
      */
     public String getUriString() {
         return acc_id;
-    }
-
-
-    // Helpers static factory
-    /**
-     * Helper method to retrieve a SipProfile object from its account database
-     * id.<br/>
-     * You have to specify the projection you want to use for to retrieve infos.<br/>
-     * As consequence the wrapper SipProfile object you'll get may be
-     * incomplete. So take care if you try to reinject it by updating to not
-     * override existing values of the database that you don't get here.
-     *
-     * @param ctxt Your application context. Mainly useful to get the content provider for the request.
-     * @param accountId The sip profile {@link #FIELD_ID} you want to retrieve.
-     * @param projection The list of fields you want to retrieve. Must be in FIELD_* of this class.<br/>
-     * Reducing your requested fields to minimum will improve speed of the request.
-     * @return A wrapper SipProfile object on the request you done. If not found an invalid account with an {@link #id} equals to {@link #INVALID_ID}
-     */
-    public static SipProfile getProfileFromDbId(Context ctxt, long accountId, String[] projection) {
-        SipProfile account = new SipProfile();
-        if (accountId != INVALID_ID) {
-            Cursor c = ctxt.getContentResolver().query(
-                    ContentUris.withAppendedId(ACCOUNT_ID_URI_BASE, accountId),
-                    projection, null, null, null);
-
-            if (c != null) {
-                try {
-                    if (c.getCount() > 0) {
-                        c.moveToFirst();
-                        account = new SipProfile(c);
-                    }
-                } catch (Exception e) {
-                    Log.e(THIS_FILE, "Something went wrong while retrieving the account", e);
-                } finally {
-                    c.close();
-                }
-            }
-        }
-        return account;
-    }
-
-    /**
-     * Get the list of sip profiles available.
-     * @param ctxt Your application context. Mainly useful to get the content provider for the request.
-     * @param onlyActive Pass it to true if you are only interested in active accounts.
-     * @return The list of SipProfiles containings only fields of {@link #LISTABLE_PROJECTION} filled.
-     * @see #LISTABLE_PROJECTION
-     */
-    public static ArrayList<SipProfile> getAllProfiles(Context ctxt, boolean onlyActive) {
-        return getAllProfiles(ctxt, onlyActive, LISTABLE_PROJECTION);
-    }
-
-    /**
-     * Get the list of sip profiles available.
-     * @param ctxt Your application context. Mainly useful to get the content provider for the request.
-     * @param onlyActive Pass it to true if you are only interested in active accounts.
-     * @param projection The projection to use for cursor
-     * @return The list of SipProfiles
-     */
-    public static ArrayList<SipProfile> getAllProfiles(Context ctxt, boolean onlyActive, String[] projection) {
-        ArrayList<SipProfile> result = new ArrayList<SipProfile>();
-
-        String selection = null;
-        String[] selectionArgs = null;
-        if (onlyActive) {
-            selection = SipProfile.FIELD_ACTIVE + "=?";
-            selectionArgs = new String[] {
-                    "1"
-            };
-        }
-        Cursor c = ctxt.getContentResolver().query(ACCOUNT_URI, projection, selection, selectionArgs, null);
-
-        if (c != null) {
-            try {
-                if (c.moveToFirst()) {
-                    do {
-                        result.add(new SipProfile(c));
-                    } while (c.moveToNext());
-                }
-            } catch (Exception e) {
-                Log.e(THIS_FILE, "Error on looping over sip profiles", e);
-            } finally {
-                c.close();
-            }
-        }
-
-        return result;
     }
 
 }
