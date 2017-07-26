@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#263238"
+    tools:context="vn.rta.ipcall.ui.IncomingIPCallActivity">
+
+    <android.support.v7.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:minHeight="?attr/actionBarSize"
+        app:contentInsetEnd="16dp"
+        app:contentInsetLeft="16dp"
+        app:contentInsetStart="16dp"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        app:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:title="IP voice call"
+        app:titleMarginStart="32dp"
+        app:titleTextColor="@android:color/white" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/ll_call_button"
+        android:layout_below="@id/toolbar">
+
+        <vn.rta.ipcall.ui.CallLoadingIndicatorView
+            android:id="@+id/av_loading"
+            android:layout_width="360dp"
+            android:layout_height="360dp"
+            android:layout_centerInParent="true"
+            app:animationDuration="4000"
+            app:indicatorColor="#f2f2f2"
+            app:indicatorName="BallScaleMultipleIndicator"
+            app:keepOriginDelay="false" />
+
+        <ImageView
+            android:id="@+id/img_avatar_placeholder"
+            android:layout_width="@dimen/img_avatar_placeholder_width"
+            android:layout_height="@dimen/img_avatar_placeholder_width"
+            android:layout_centerInParent="true"
+            android:layout_margin="8dp"
+            android:scaleType="fitXY"
+            android:src="@drawable/ic_circle" />
+
+        <ImageView
+            android:id="@+id/img_avatar"
+            android:layout_width="@dimen/img_avatar_width"
+            android:layout_height="@dimen/img_avatar_width"
+            android:layout_centerInParent="true"
+            android:layout_margin="8dp"
+            android:scaleType="fitXY"
+            android:src="@drawable/ic_account_circle_white" />
+
+        <Chronometer
+            android:id="@+id/elapsedTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/img_avatar"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="8dp"
+            android:textColor="@color/white"
+            android:textSize="@dimen/ip_call_btn_text_size"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/txt_call_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/img_avatar"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="8dp"
+            android:text="Incoming call"
+            android:textColor="@color/white"
+            android:textSize="@dimen/ip_call_btn_text_size" />
+
+        <TextView
+            android:id="@+id/txt_phone_number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/img_avatar"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="8dp"
+            android:text="0168 493 4109"
+            android:textColor="@color/white"
+            android:textSize="@dimen/ip_call_btn_text_size" />
+    </RelativeLayout>
+
+
+    <LinearLayout
+        android:id="@id/ll_call_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/bottom_bar_button"
+        android:orientation="horizontal"
+        android:padding="8dp">
+
+        <RelativeLayout
+            android:id="@+id/btn_accept_call"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_btn_height"
+            android:layout_margin="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_rounded_button_green">
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/txt_accept_call"
+                android:src="@drawable/ic_call_white_24dp" />
+
+            <TextView
+                android:id="@id/txt_accept_call"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:layout_marginStart="-8dp"
+                android:paddingStart="24dp"
+                android:text="Answer"
+                android:textAlignment="center"
+                android:textColor="@color/white"
+                android:textSize="@dimen/ip_call_btn_text_size" />
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/btn_decline_call"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_btn_height"
+            android:layout_margin="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_rounded_button_red">
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/txt_decline_call"
+                android:src="@drawable/ic_end_call_white" />
+
+            <TextView
+                android:id="@id/txt_decline_call"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:layout_marginStart="-8dp"
+                android:paddingStart="24dp"
+                android:text="Decline"
+                android:textAlignment="center"
+                android:textColor="@color/white"
+                android:textSize="@dimen/ip_call_btn_text_size" />
+        </RelativeLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@id/bottom_bar_button"
+        style="@style/Widget.AppCompat.Light.ActionBar.TabBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="8dp"
+        android:background="?attr/colorPrimary"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/btn_micro"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_bottom_action_bar_height"
+            android:layout_weight="1"
+            android:background="@color/colorPrimary"
+            android:padding="8dp"
+            android:src="@drawable/ic_mic_white" />
+
+        <ImageButton
+            android:id="@+id/btn_dialpad"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_bottom_action_bar_height"
+            android:layout_weight="1"
+            android:background="@color/colorPrimary"
+            android:padding="8dp"
+            android:src="@drawable/ic_dialpad_white" />
+
+        <ImageButton
+            android:id="@+id/btn_speaker"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_bottom_action_bar_height"
+            android:layout_weight="1"
+            android:background="@color/colorPrimary"
+            android:padding="8dp"
+            android:src="@drawable/ic_low_volume_white" />
+
+        <ImageButton
+            android:id="@+id/btn_add_call"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_bottom_action_bar_height"
+            android:layout_weight="1"
+            android:background="@color/colorPrimary"
+            android:padding="8dp"
+            android:src="@drawable/ic_add_call_white" />
+
+        <ImageButton
+            android:id="@+id/btn_minimize"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/ip_call_bottom_action_bar_height"
+            android:layout_weight="1"
+            android:background="@color/colorPrimary"
+            android:padding="8dp"
+            android:src="@drawable/ic_minimize_white" />
+    </LinearLayout>
+
+    <vn.rta.ipcall.ui.Numpad
+        android:id="@+id/numpad"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:layout_marginBottom="10dp"
+        android:layout_marginTop="50dp"
+        android:background="@color/colorF"
+        android:contentDescription="@string/content_description_numpad"
+        android:visibility="gone" />
+</RelativeLayout>

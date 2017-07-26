@@ -3,14 +3,12 @@ package vn.rta.survey.android.widgets;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.MediaPlayer;
 import android.support.v4.app.ActivityCompat;
-import android.support.v7.widget.AppCompatButton;
+import android.support.v4.content.ContextCompat;
 import android.util.TypedValue;
-import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -28,6 +26,7 @@ import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.external.ExternalDataUtil;
 import org.odk.collect.android.utilities.MediaUtils;
+import org.odk.collect.android.utilities.TextUtils;
 import org.odk.collect.android.widgets.QuestionWidget;
 
 import java.io.File;
@@ -43,14 +42,18 @@ import vn.rta.survey.android.listeners.SaveCurrentAnswerListener;
 import vn.rta.survey.android.listeners.SipCallUpdateUIListener;
 import vn.rta.survey.android.manager.ActivityLogManager;
 import vn.rta.survey.android.manager.IPCallManager;
+import vn.rta.survey.android.utilities.Utils;
+import vn.rta.survey.android.views.component.FEGenericButton;
 
 /**
  * Created by ThiNguyen on 8/25/16.
+ *
+ * Modified by GeniusDoan
  */
 public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIListener {
     private final static String t = "MediaWidget";
     LinearLayout buttonLayout;
-    private AppCompatButton
+    private FEGenericButton
             mCaptureButton;
     private String mBinaryName;
     private String mInstanceFolder;
@@ -128,8 +131,8 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         }
 
         if (IPCallManager.getInstance().isRunning() && LinphoneService.isReady()) {
-            updateCallButton(true);
             //TODO: Check here: call before service created so linphone manager is not instantiated
+            mCaptureButton.setEnabled(true);
             LinphoneManager.getInstance().setAlreadyAcceptedOrDeniedCall(false);
         }
     }
@@ -173,17 +176,23 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
 
         imageParams.gravity = Gravity.CENTER;
         imageParams.setMargins(MARGIN_BOT, MARGIN_BOT, MARGIN_BOT, MARGIN_BOT);
-        ContextThemeWrapper contextThemeWrapper = new ContextThemeWrapper(getContext(), R.style.ButtonCustom);
-        mCaptureButton = new AppCompatButton(contextThemeWrapper);
+        mCaptureButton = new FEGenericButton(mContext);
         mCaptureButton.setId(QuestionWidget.newUniqueId());
+        mCaptureButton.setIcon(R.drawable.ic_call);
+        mCaptureButton.setAppearance(mPrompt.getAppearanceHint());
 
-        if (!LinphoneService.isReady())
-            mCaptureButton.setText(this.getResources().getString(R.string.call_connecting));
-        else
+        if (questionText == null || questionText.isEmpty()) {
             mCaptureButton.setText(this.getResources().getString(R.string.call));
+        } else {
+            if (Utils.isHtmlCode(questionText)) {
+                mCaptureButton.setText(TextUtils.textToHtml(questionText, getPercentWidth(false), colspan, rowspan));
+            } else {
+                mCaptureButton.setText(questionText);
+            }
+        }
 
         mCaptureButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, mAnswerFontsize);
-        mCaptureButton.getBackground().setColorFilter(colorButton, PorterDuff.Mode.SRC);
+        mCaptureButton.setBackgroundColor(ContextCompat.getColor(mContext, R.color.colorPrimary));
 
         // launch capture intent on click
         mCaptureButton.setOnClickListener(new View.OnClickListener() {
@@ -261,7 +270,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
             activity.saveAndrefeshWhenRemoveData();
         }
         // delete from media provider
-        int del = MediaUtils.deleteImageFileFromMediaProvider(mInstanceFolder + File.separator + name);
+        MediaUtils.deleteImageFileFromMediaProvider(mInstanceFolder + File.separator + name);
     }
 
     private void deleteMedianotSave() {
@@ -270,7 +279,7 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
         // clean up variables
         mBinaryName = null;
         // delete from media provider
-        int del = MediaUtils.deleteImageFileFromMediaProvider(mInstanceFolder + File.separator + name);
+        MediaUtils.deleteImageFileFromMediaProvider(mInstanceFolder + File.separator + name);
     }
 
     @Override
@@ -360,10 +369,9 @@ public class SIPCallWidget extends QuestionWidget implements SipCallUpdateUIList
 
 
     @Override
-    public void updateCallButton(boolean isConnected) {
+    public void updateCallButton(boolean isConnected, String statusMessage) {
         if (mCaptureButton != null) {
             mCaptureButton.setEnabled(isConnected);
-            mCaptureButton.setText(getResources().getString(R.string.call));
         }
     }
 

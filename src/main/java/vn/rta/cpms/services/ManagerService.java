@@ -19,19 +19,12 @@ import android.widget.RemoteViews;
 
 import org.apache.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import vn.rta.cpms.application.Params;
+import vn.rta.cpms.preference.WorkProfilePreferences;
 import vn.rta.cpms.receivers.ConnectionChangeReceiver;
 import vn.rta.cpms.receivers.RTASurveyActionReceiver;
 import vn.rta.cpms.receivers.RTASurveyWorkingReceiver;
 import vn.rta.cpms.receivers.ReloadAppReceiver;
-import vn.rta.cpms.services.model.Environment;
-import vn.rta.cpms.services.model.Form;
 import vn.rta.cpms.services.model.Schedule;
-import vn.rta.cpms.services.model.ValidLocation;
-import vn.rta.cpms.tasks.ConnectionTask;
 import vn.rta.cpms.timers.MessageCheckTimer;
 import vn.rta.cpms.timers.TraceDataTimer;
 import vn.rta.cpms.timers.TraceLocationTimer;
@@ -46,19 +39,19 @@ import vn.rta.survey.android.manager.NotificationCreator;
 
 /**
  * @author VietDung <dungvu@rta.vn>
- * 
- * @modifiedBy VietDung (version 4.9_108, May04 2015): 
+ *
+ * @modifiedBy VietDung (version 4.9_108, May04 2015):
  *  register more action in RTA Survey Action receiver.
- * 
+ *
  * @modifiedBy VietDung (version 4.9_105, Mar09 2015): more detail logging for SmartSchedule.
- * 
- * @modifiedBy VietDung (version 4.9_103, Feb14 2015): unregisterReceiver() for 
+ *
+ * @modifiedBy VietDung (version 4.9_103, Feb14 2015): unregisterReceiver() for
  * surveyWorkingReceiver.
- * 
+ *
  * @modifiedBy VietDung (version 4.9_99, Feb06 2015): upgrade SmartSchedule mechanism,
  * compatible with RTASurvey from version 1.6.7(63)
- * 
- * @modifiedBy VietDung (Jan9, 2015): 
+ *
+ * @modifiedBy VietDung (Jan9, 2015):
  * ignore checking expired date of schedule
  *
  */
@@ -79,12 +72,11 @@ public class ManagerService extends Service
 	private static boolean movementLocker = false;
 	private static boolean workingLocker = false;
 
-    private final Logger log = Logger.getLogger(ManagerService.class);
+	private final Logger log = Logger.getLogger(ManagerService.class);
 
 	private DBService db;
 	private ConnectionService connection;
 	private LocationManager locManager;
-	private ContentResolver contentResolver;
 	private RTASurveyActionReceiver surveyActionReceiver;
 	private RTASurveyWorkingReceiver surveyWorkingReceiver;
 	private ConnectionChangeReceiver connectionChangeReceiver;
@@ -93,9 +85,8 @@ public class ManagerService extends Service
 	private TraceDataTimer traceDataTimer;
 	private TraceLocationTimer traceLocationTimer;
 	private UploadTimer uploadTimer;
-	//private SoundCheckTimer soundCheckTimer;
 	private MessageCheckTimer rcmTimer;
-	private Schedule schedule;
+	private WorkProfilePreferences workProfile;
 	private Location currentLocation;
 
 	@Override
@@ -111,6 +102,7 @@ public class ManagerService extends Service
 		// Create service
 		connection = ConnectionService.getInstance();
 		db = DBService.getInstance();
+		workProfile = WorkProfilePreferences.getInstance(this);
 
 		// Register receiver for RTASurvey actions
 		final IntentFilter filter = new IntentFilter();
@@ -185,26 +177,25 @@ public class ManagerService extends Service
 				collectDeviceStatusInIdleMode();
 			}
 
-			if (!RTASurvey.getInstance().isGCMRegisteredFlag() &&
-					Common.isConnect(RTASurvey.getInstance().getApplicationContext())) {
+			if (Common.isConnect(RTASurvey.getInstance().getApplicationContext())) {
 				if (rcmTimer != null) {
 					rcmTimer.cancel();
 					rcmTimer.purge();
 					log.info("rcmTimer has been stopped");
 				}
 				rcmTimer = new MessageCheckTimer();
-				rcmTimer.start();
+				rcmTimer.start(workProfile.get().getRcmPeriod());
 			}
 
 			//start floating ntfAction counter
-            startService(new Intent(getApplicationContext(), FloatingNtfActionService.class));
+			startService(new Intent(getApplicationContext(), FloatingNtfActionService.class));
 
 		} else if(action.equals(ACTION_STOP_RCM)) {
 			if (rcmTimer != null) {
 				rcmTimer.cancel();
 				rcmTimer.purge();
 				rcmTimer = null;
-                log.info("rcmTimer has been stopped");
+				log.info("rcmTimer has been stopped");
 			}
 		} else if (action.equals(ACTION_START_RCM)) {
 			if (rcmTimer != null) {
@@ -213,23 +204,17 @@ public class ManagerService extends Service
 				rcmTimer = null;
 			}
 			rcmTimer = new MessageCheckTimer();
-			rcmTimer.start();
+			rcmTimer.start(workProfile.get().getRcmPeriod());
 
 		} else if (action.equals(ACTION_UPDATE_SCHEDULE)) {
-            if (!RTASurvey.getInstance().isTrackingServiceLocked()) {
-                new ConnectionTask(getApplicationContext()){
-                    @Override
-                    protected Boolean doInBackground(String... params) {
-                        Schedule schedule = updateSchedule();
-                        if (!isCollectingInIdleMode && !isCollectingInRealTimeMode) {
-                            collectDeviceStatusInIdleMode();
-                        } else if (isCollectingInRealTimeMode) {
-                            collectDeviceStatus(schedule);
-                        }
-                        return true;
-                    }
-                }.execute();
-            }
+			if (!RTASurvey.getInstance().isTrackingServiceLocked()) {
+				if (!isCollectingInIdleMode && !isCollectingInRealTimeMode) {
+					collectDeviceStatusInIdleMode();
+				} else if (isCollectingInRealTimeMode) {
+					Schedule schedule = workProfile.get();
+					collectDeviceStatus(schedule);
+				}
+			}
 		}
 
 		return START_REDELIVER_INTENT;
@@ -238,8 +223,8 @@ public class ManagerService extends Service
 	@Override
 	public void onDestroy() {
 		super.onDestroy();
-        stopService(new Intent(getApplicationContext(), FloatingNtfActionService.class));
-        stopService(new Intent(getApplicationContext(), OverlayService.class));
+		stopService(new Intent(getApplicationContext(), FloatingNtfActionService.class));
+		stopService(new Intent(getApplicationContext(), OverlayService.class));
 
 		// Stop collect and upload trace data
 		isCollectingInIdleMode = false;
@@ -270,41 +255,36 @@ public class ManagerService extends Service
 			unregisterReceiver(surveyWorkingReceiver);
 			surveyWorkingReceiver = null;
 		}
-        if (connectionChangeReceiver != null) {
-            unregisterReceiver(connectionChangeReceiver);
-            connectionChangeReceiver = null;
-        }
-        if (reloadReceiver != null) {
-            unregisterReceiver(reloadReceiver);
-            reloadReceiver = null;
-        }
+		if (connectionChangeReceiver != null) {
+			unregisterReceiver(connectionChangeReceiver);
+			connectionChangeReceiver = null;
+		}
+		if (reloadReceiver != null) {
+			unregisterReceiver(reloadReceiver);
+			reloadReceiver = null;
+		}
 
-        if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            locManager.removeUpdates(this);
-        }
+		if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+				== PackageManager.PERMISSION_GRANTED) {
+			locManager.removeUpdates(this);
+		}
 
-        db.getDbHelper().close();
+		db.getDbHelper().close();
 
-        log.info("ManagerService is stopped");
+		log.info("ManagerService is stopped");
 	}
 
 	/**
 	 * Collect device status with idle period
 	 */
 	public void collectDeviceStatusInIdleMode() {
-		Schedule idle = db.getNewestSchedule();
+		Schedule normal = workProfile.get();
+		Schedule idle = new Schedule();
+		idle.setScheduleName("Idle schedule - created by app");
 
-		if (idle==null) {
-			log.error("Has not schedule yet");
-			return;
-		}
-		
-		int idleFrequency = RTASurvey.getInstance().getIdleFrequency();
-		idle.setPeriodCollect(idleFrequency);
-		idle.setPeriodUpload(idleFrequency);
-		idle.setPeriodCollect_gps(idleFrequency);
-		idle.setStatus(Params.DETECT_ACTIVE);
+		idle.setPeriodCollect(computeIdlePeriod(normal.getPeriodCollect()));
+		idle.setPeriodUpload(computeIdlePeriod(normal.getPeriodUpload()));
+		idle.setPeriodCollect_gps(computeIdlePeriod(normal.getPeriodCollect_gps()));
 
 		isCollectingInIdleMode = true;
 		isCollectingInRealTimeMode = false;
@@ -313,64 +293,22 @@ public class ManagerService extends Service
 		collectDeviceStatus(idle);
 	}
 
+	private int computeIdlePeriod(int normal) {
+		int idle = RTASurvey.getInstance().getIdleFrequency();
+		return idle > (normal * 2) ? idle : (normal * 2);
+	}
+
 	/**
 	 * Collect device status
 	 */
-	public void collectDeviceStatus(Schedule sched) {
-		// Case get schedule fail, using old schedule
-		if (sched == null) {
-			// try to get old schedule from database
-			schedule = db.getNewestSchedule();
-
-			// Stop processing if schedule is null
-			if (schedule == null) {
-				log.info("Has not schedule yet");
-                return;
-			}
-		}
-
-		// Case schedule is empty for device - currently, never come here
-		else if (Params.DETECT_ACTIVE != sched.getStatus()) {
-			log.info("Has not schedule yet");
-
-            // Stop processing and reset data
-			schedule = null;
-
-			// Stop collect data timer if exist
-			if (traceDataTimer != null) {
-				traceDataTimer.cancel();
-			}
-
-			// Stop sound checking timer if exist
-			/*if (soundCheckTimer != null) {
-				soundCheckTimer.cancel();
-			}*/
-
-			// Stop detecting sound timer if exist
-			/*if (detectTimer != null) {
-				detectTimer.cancel();
-			}*/
-
-			// Stop upload trace data if exist
-			if (uploadTimer != null) {
-				uploadTimer.cancel();
-			}
-			return;
-		}
-
-
-		log.info("Start collecting device status");
-        if (sched!=null) {
-			this.schedule = sched;
-		}
-
+	public void collectDeviceStatus(Schedule schedule) {
 		// Stop collect data timer if exist
 		if (traceDataTimer != null) {
 			traceDataTimer.cancel();
 		}
 		// Create new timers running new task
 		traceDataTimer = new TraceDataTimer();
-		traceDataTimer.schedule(schedule, this, db);
+		traceDataTimer.schedule(this, db, schedule.getPeriodCollect());
 
 		// Stop collect data timer if exist
 		if (traceLocationTimer != null) {
@@ -378,72 +316,15 @@ public class ManagerService extends Service
 		}
 		// Create new timers running new task
 		traceLocationTimer = new TraceLocationTimer();
-		traceLocationTimer.schedule(schedule, this, db);
-
-		// Stop sound checking timer if exist
-		/*if (soundCheckTimer != null) {
-			soundCheckTimer.cancel();
-		}
-
-		// Check expired time
-		if (Common.hasNotExpired(schedule.getEndTime())) {
-			soundCheckTimer = new SoundCheckTimer();
-			soundCheckTimer.schedule(schedule, this, recorder);
-		}*/
+		traceLocationTimer.schedule(this, db, schedule.getPeriodCollect_gps());
 
 		// Stop upload trace data if exist
 		if (uploadTimer != null) {
 			uploadTimer.cancel();
 		}
 		uploadTimer = new UploadTimer();
-		uploadTimer.schedule(schedule, connection, db);
+		uploadTimer.schedule(connection, db, schedule.getPeriodUpload());
 
-	}
-
-	private Schedule updateSchedule() {
-		// Get synchronize info in server
-		String formIdForUpdate = RTASurvey.getInstance().getFormId();
-		String res;
-		if (formIdForUpdate.equals("")) {
-			res = connection.synchronize(
-                    this, RTASurvey.getInstance().getServerUrl(),
-                    RTASurvey.getInstance().getServerKey(), RTASurvey.getInstance().getDeviceId());
-		} else {
-			res = connection.updateSchedule(
-                    this, RTASurvey.getInstance().getServerUrl(),
-                    RTASurvey.getInstance().getServerKey(), 
-                    RTASurvey.getInstance().getDeviceId(), formIdForUpdate);
-			if (res==null) {
-				res = connection.synchronize(
-						this, RTASurvey.getInstance().getServerUrl(),
-						RTASurvey.getInstance().getServerKey(), RTASurvey.getInstance().getDeviceId());
-			}
-		}
-
-		// Parse JSON result to Schedule
-		Schedule schedule = (Schedule) StringUtil.json2Object(res,
-				Schedule.class);
-
-		// Default value for status
-		if (schedule!=null) {
-			schedule.setStatus(Params.DETECT_ACTIVE);
-            log.info("" + schedule);
-
-			// Add sample data for Reliable rate checking (temporary)
-			List<Environment> envs = new ArrayList<Environment>();
-			List<ValidLocation> fields = new ArrayList<ValidLocation>();
-			List<Form> forms = new ArrayList<Form>();
-
-			schedule.setEnvironments(envs);
-			schedule.setFields(fields);
-			schedule.setForms(forms);
-
-			// save to fadata.db
-			db.saveSchedule(schedule);
-			this.schedule = schedule;
-		}
-
-		return schedule;
 	}
 
 	@Override
@@ -454,10 +335,10 @@ public class ManagerService extends Service
 		} else if ( currentLocation.distanceTo(location)>=activeDistance ) {
 			// collecting in real time activate
 			log.debug("try to start real-time mode from movementLocker" +
-                    "\nactivaDistance=" + activeDistance + ", current=" +
-                    currentLocation.distanceTo(location));
+					"\nactivaDistance=" + activeDistance + ", current=" +
+					currentLocation.distanceTo(location));
 			currentLocation = location;
-			startRealTimeMode(null);
+			startRealTimeMode();
 		} else {
 			if (isCollectingInRealTimeMode) {
 				log.debug("movementLocker has been set");
@@ -480,7 +361,7 @@ public class ManagerService extends Service
 
 	@Override
 	public void onProviderDisabled(String provider) {
-		if (locManager.getProviders(true).contains(LocationManager.GPS_PROVIDER) 
+		if (locManager.getProviders(true).contains(LocationManager.GPS_PROVIDER)
 				|| locManager.getProviders(true).contains(LocationManager.NETWORK_PROVIDER) ) {
 			requestLocationUpdates();
 		}
@@ -488,27 +369,27 @@ public class ManagerService extends Service
 
 	private boolean requestLocationUpdates() {
 		if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+				== PackageManager.PERMISSION_GRANTED) {
+			locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
-            String provider = getActiveLocationProvider();
-            if (provider==null) {
-                isLocationProviderUnavailable = true;
-                return false;
-            }
+			String provider = getActiveLocationProvider();
+			if (provider==null) {
+				isLocationProviderUnavailable = true;
+				return false;
+			}
 
-            locManager.requestLocationUpdates(provider,
-                    RTASurvey.getInstance().getVeclocityTime(), 0,
-                    this, Looper.getMainLooper());
-            return true;
-        } else {
-            log.error("GPS Permission isn't granted.");
-            return false;
-        }
+			locManager.requestLocationUpdates(provider,
+					RTASurvey.getInstance().getVeclocityTime(), 0,
+					this, Looper.getMainLooper());
+			return true;
+		} else {
+			log.error("GPS Permission isn't granted.");
+			return false;
+		}
 	}
 
 	private String getActiveLocationProvider() {
-		if (locManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) 
+		if (locManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
 			return LocationManager.GPS_PROVIDER;
 		if (locManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
 			return LocationManager.NETWORK_PROVIDER;
@@ -521,23 +402,24 @@ public class ManagerService extends Service
 				collectDeviceStatusInIdleMode();
 				workingLocker = movementLocker = false;
 				log.debug("RealtimeMode stopped, IdleMode started!");
-            }
+			}
 		} else {
 			if (movementLocker && workingLocker) {
 				collectDeviceStatusInIdleMode();
 				workingLocker = movementLocker = false;
 				log.debug("RealtimeMode stopped, IdleMode started!");
-            }
+			}
 		}
 	}
 
-	private void startRealTimeMode(Schedule schedule) {
+	private void startRealTimeMode() {
 		log.debug("start RealtimeMode");
-        isCollectingInIdleMode = false;
+		isCollectingInIdleMode = false;
 		isCollectingInRealTimeMode = true;
 		movementLocker = workingLocker = false;
 
-        log.info("REAL-TIME MODE");
+		log.info("REAL-TIME MODE");
+		Schedule schedule = workProfile.get();
 		collectDeviceStatus(schedule);
 	}
 
@@ -546,7 +428,7 @@ public class ManagerService extends Service
 		// since version 4.5_68
 		if (!isCollectingInRealTimeMode) {
 			log.debug("Try to start real-time mode from workingLocker");
-			startRealTimeMode(null);
+			startRealTimeMode();
 		}
 	}
 

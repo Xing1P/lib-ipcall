@@ -40,27 +40,30 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import com.rta.ipcall.compatibility.Compatibility;
-import com.rta.ipcall.ui.UpdateUIListener;
+import com.rta.ipcall.ui.OnUpdateUIListener;
 
 import org.linphone.core.LinphoneAddress;
+import org.linphone.core.LinphoneAuthInfo;
 import org.linphone.core.LinphoneCall;
 import org.linphone.core.LinphoneCall.State;
 import org.linphone.core.LinphoneCallLog.CallStatus;
 import org.linphone.core.LinphoneCore;
 import org.linphone.core.LinphoneCoreFactory;
-import org.linphone.core.LinphoneCoreFactoryImpl;
 import org.linphone.core.LinphoneCoreListenerBase;
 import org.linphone.core.LinphoneProxyConfig;
-import org.linphone.mediastream.Log;
+import org.linphone.core.Reason;
 import org.linphone.mediastream.Version;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Linphone service, reacting to Incoming calls, ...<br />
@@ -87,8 +90,9 @@ public class LinphoneService extends Service {
     private static final Class<?>[] mStartFgSign = new Class[]{
             int.class, Notification.class};
     private static final Class<?>[] mStopFgSign = new Class[]{boolean.class};
+    private static final String TAG = LinphoneService.class.getSimpleName();
     private static LinphoneService instance;
-    private static UpdateUIListener mUpdateUIListener;
+    private static List<OnUpdateUIListener> mUpdateUIListenerList = new ArrayList<>();
     public Handler mHandler = new Handler();
     LinphoneCall callInfo;
     //	private boolean mTestDelayElapsed; // add a timer for testing
@@ -126,12 +130,18 @@ public class LinphoneService extends Service {
         throw new RuntimeException("LinphoneService not instantiated yet");
     }
 
-    public static void setOnUpdateUIListener(UpdateUIListener listener) {
-        mUpdateUIListener = listener;
+    public static void addOnUpdateUIListener(OnUpdateUIListener listener) {
+        if (!mUpdateUIListenerList.contains(listener))
+            mUpdateUIListenerList.add(listener);
+    }
+
+    public static void removeOnUpdateUIListener(OnUpdateUIListener listener) {
+        if (mUpdateUIListenerList.contains(listener))
+            mUpdateUIListenerList.remove(listener);
     }
 
     protected void onBackgroundMode() {
-        Log.i("App has entered background mode");
+        Log.i(TAG, "App has entered background mode");
         if (LinphonePreferences.instance() != null && LinphonePreferences.instance().isFriendlistsubscriptionEnabled()) {
             if (LinphoneManager.isInstanciated())
                 LinphoneManager.getInstance().subscribeFriendList(false);
@@ -139,7 +149,7 @@ public class LinphoneService extends Service {
     }
 
     protected void onForegroundMode() {
-        Log.i("App has left background mode");
+        Log.i(TAG, "App has left background mode");
         if (LinphonePreferences.instance() != null && LinphonePreferences.instance().isFriendlistsubscriptionEnabled()) {
             if (LinphoneManager.isInstanciated())
                 LinphoneManager.getInstance().subscribeFriendList(true);
@@ -211,7 +221,7 @@ public class LinphoneService extends Service {
         LinphoneCoreFactory.instance().setDebugMode(isDebugEnabled, getString(R.string.app_name));
 
         // Dump some debugging information to the logs
-        Log.i(START_LINPHONE_LOGS);
+        Log.i(TAG, START_LINPHONE_LOGS);
         dumpDeviceInformation();
         dumpInstalledLinphoneInformation();
 
@@ -220,19 +230,18 @@ public class LinphoneService extends Service {
         LinphoneManager.createAndStart(LinphoneService.this);
 
         instance = this; // instance is ready once linphone manager has been created
-        if (mUpdateUIListener != null)
-            mUpdateUIListener.updateUIByServiceStatus(true);
+        updateUIByServiceStatus(true);
 
         LinphoneManager.getLc().addListener(mListener = new LinphoneCoreListenerBase() {
             @Override
             public void callState(LinphoneCore lc, LinphoneCall call, LinphoneCall.State state, String message) {
                 if (instance == null) {
-                    Log.i("Service not ready, discarding call state change to ", state.toString());
+                    Log.i(TAG, "Service not ready, discarding call state change to " + state.toString());
                     return;
                 }
 
                 if (state == LinphoneCall.State.IncomingReceived) {
-                    onIncomingReceived();
+                    onIncomingReceived(call);
                 }
 
                 if (state == State.CallEnd || state == State.CallReleased || state == State.Error) {
@@ -275,11 +284,51 @@ public class LinphoneService extends Service {
 
             @Override
             public void registrationState(LinphoneCore lc, LinphoneProxyConfig cfg, LinphoneCore.RegistrationState state, String smessage) {
-//				if (instance == null) {
-//					Log.i("Service not ready, discarding registration state change to ",state.toString());
-//					return;
-//				}
-                if (!mDisableRegistrationStatus) {
+                Log.e("IPCall", cfg.getAddress() + smessage);
+                if (!LinphoneService.isReady()) {
+                    return;
+                }
+
+                LinphoneAuthInfo authInfo = lc.findAuthInfo(cfg.getIdentity(), cfg.getRealm(), cfg.getDomain());
+                if (state.equals(LinphoneCore.RegistrationState.RegistrationCleared)) {
+                    if (lc != null) {
+                        if (authInfo != null)
+                            lc.removeAuthInfo(authInfo);
+                    }
+                }
+
+                if(state.equals(LinphoneCore.RegistrationState.RegistrationFailed)) {
+                    if (cfg.getError() == Reason.BadCredentials) {
+                        Toast.makeText(LinphoneService.this, getString(R.string.error_bad_credentials), Toast.LENGTH_SHORT).show();
+                    }
+                    if (cfg.getError() == Reason.Unauthorized) {
+                        Toast.makeText(LinphoneService.this, getString(R.string.error_unauthorized), Toast.LENGTH_SHORT).show();
+                    }
+                    if (cfg.getError() == Reason.IOError) {
+                        Toast.makeText(LinphoneService.this, getString(R.string.error_io_error), Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                if (lc.getProxyConfigList() == null) {
+                    LinphoneService.this.registrationState(false, getString(R.string.no_account));
+                } else {
+                    LinphoneService.this.registrationState(false, getString(R.string.status_not_connected));
+                }
+
+                if (lc.getDefaultProxyConfig() != null && lc.getDefaultProxyConfig().equals(cfg)) {
+                    String status = getRegistrationStatus(state);
+                    if (status.equals(getString(R.string.status_connected)))
+                        LinphoneService.this.registrationState(true, status);
+                    else {
+                        LinphoneService.this.registrationState(false, status);
+                    }
+                } else if (lc.getDefaultProxyConfig() == null) {
+                    String status = getRegistrationStatus(state);
+                    if (status.equals(getString(R.string.status_connected)))
+                        LinphoneService.this.registrationState(true, status);
+                    else {
+                        LinphoneService.this.registrationState(false, status);
+                    }
                 }
             }
         });
@@ -290,14 +339,16 @@ public class LinphoneService extends Service {
             try {
                 mSetForeground = getClass().getMethod("setForeground", mSetFgSign);
             } catch (NoSuchMethodException e) {
-                Log.e(e, "Couldn't find foreground method");
+                e.printStackTrace();
+                Log.e(TAG, "Couldn't find foreground method");
             }
         } else {
             try {
                 mStartForeground = getClass().getMethod("startForeground", mStartFgSign);
                 mStopForeground = getClass().getMethod("stopForeground", mStopFgSign);
             } catch (NoSuchMethodException e) {
-                Log.e(e, "Couldn't find startForeground or stopForeground");
+                e.printStackTrace();
+                Log.e(TAG, "Couldn't find startForeground or stopForeground");
             }
         }
 
@@ -333,8 +384,27 @@ public class LinphoneService extends Service {
             incallNotifId = -1;
         }
 
-        if (mUpdateUIListener != null)
-            mUpdateUIListener.dismissCallActivity();
+        if (mUpdateUIListenerList != null) {
+            for (int i = 0; i < mUpdateUIListenerList.size(); i++) {
+                mUpdateUIListenerList.get(i).dismissCallActivity();
+            }
+        }
+    }
+
+    private void registrationState(boolean isConnected, String statusMessage) {
+        if (mUpdateUIListenerList != null) {
+            for (int i = 0; i < mUpdateUIListenerList.size(); i++) {
+                mUpdateUIListenerList.get(i).registrationState(isConnected, statusMessage);
+            }
+        }
+    }
+
+    private void updateUIByServiceStatus(boolean isConnected) {
+        if (mUpdateUIListenerList != null) {
+            for (int i = 0; i < mUpdateUIListenerList.size(); i++) {
+                mUpdateUIListenerList.get(i).updateUIByServiceStatus(isConnected);
+            }
+        }
     }
 
     private synchronized void setIncallIcon(IncallIconState state) {
@@ -407,6 +477,24 @@ public class LinphoneService extends Service {
         }
     }
 
+    private String getRegistrationStatus(LinphoneCore.RegistrationState state) {
+        try {
+            if (state == LinphoneCore.RegistrationState.RegistrationOk && LinphoneManager.getLcIfManagerNotDestroyedOrNull().getDefaultProxyConfig().isRegistered()) {
+                return getString(R.string.status_connected);
+            } else if (state == LinphoneCore.RegistrationState.RegistrationProgress) {
+                return getString(R.string.status_in_progress);
+            } else if (state == LinphoneCore.RegistrationState.RegistrationFailed) {
+                return getString(R.string.status_error);
+            } else {
+                return getString(R.string.status_not_connected);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return getString(R.string.status_not_connected);
+    }
+
     @Deprecated
     public void addNotification(Intent onClickIntent, int iconResourceID, String title, String message) {
         addCustomNotification(onClickIntent, iconResourceID, title, message, true);
@@ -477,7 +565,7 @@ public class LinphoneService extends Service {
 			if (contact != null)
 				pictureUri = contact.getThumbnailUri();
 		} catch (LinphoneCoreException e1) {
-			Log.e("Cannot parse from address ", e1);
+			Log.e(TAG, "Cannot parse from address ", e1);
 		}
 
 		Bitmap bm = null;
@@ -509,10 +597,12 @@ public class LinphoneService extends Service {
             method.invoke(this, args);
         } catch (InvocationTargetException e) {
             // Should not happen.
-            Log.w(e, "Unable to invoke method");
+            e.printStackTrace();
+            Log.w(TAG, "Unable to invoke method");
         } catch (IllegalAccessException e) {
             // Should not happen.
-            Log.w(e, "Unable to invoke method");
+            e.printStackTrace();
+            Log.w(TAG, "Unable to invoke method");
         }
     }
 
@@ -571,8 +661,7 @@ public class LinphoneService extends Service {
             sb.append(abi + ", ");
         }
         sb.append("\n");
-        sb.append("Used ABI=").append(LinphoneCoreFactoryImpl.ABI).append("\n");
-        Log.i(sb.toString());
+        Log.i(TAG, sb.toString());
     }
 
     private void dumpInstalledLinphoneInformation() {
@@ -583,9 +672,9 @@ public class LinphoneService extends Service {
         }
 
         if (info != null) {
-            Log.i("Linphone version is ", info.versionName + " (" + info.versionCode + ")");
+            Log.i(TAG, "Linphone version is " + info.versionName + " (" + info.versionCode + ")");
         } else {
-            Log.i("Linphone version is unknown");
+            Log.i(TAG, "Linphone version is unknown");
         }
     }
 
@@ -624,7 +713,7 @@ public class LinphoneService extends Service {
         if (instance != null && notification != null) {
             mNM.notify(id, notification);
         } else {
-            Log.i("Service not ready, discarding notification");
+            Log.i(TAG, "Service not ready, discarding notification");
         }
     }
 
@@ -637,7 +726,7 @@ public class LinphoneService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         if (getResources().getBoolean(R.bool.kill_service_with_task_manager)) {
-            Log.d("Task removed, stop service");
+            Log.d(TAG, "Task removed, stop service");
 
             // If push is enabled, don't unregister account, otherwise do unregister
             if (LinphonePreferences.instance().isPushNotificationEnabled()) {
@@ -656,13 +745,26 @@ public class LinphoneService extends Service {
             activityCallbacks = null;
         }
 
+        updateUIByServiceStatus(false);
+
         dismissCallActivity();
         LinphoneCore lc = LinphoneManager.getLcIfManagerNotDestroyedOrNull();
         if (lc != null) {
             lc.removeListener(mListener);
         }
 
-        LinphoneManager.getLc().clearAuthInfos();
+        //Exit form ipcall user
+        LinphonePreferences prefs = LinphonePreferences.instance();
+        int count = prefs.getAccountCount();
+        try {
+            if (count > 0) { //Leave 1 account alive
+                prefs.deleteAccount(count - 1); //Delete last account
+                android.util.Log.e("IPCall", "App IPCall account removed!");
+            }
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
 
         instance = null;
         getContentResolver().unregisterContentObserver(ContactsManager.getInstance());
@@ -690,10 +792,19 @@ public class LinphoneService extends Service {
 		notifyWrapper(NOTIF_ID, mNotif);*/
     }
 
-    protected void onIncomingReceived() {
+    protected void onIncomingReceived(LinphoneCall incomingCall) {
         //wakeup linphone
-        if (LinphoneManager.isAllowIncomingCall())
-            mUpdateUIListener.launchIncomingCallActivity();
+        if (LinphoneManager.isAllowIncomingCall()) {
+            if (mUpdateUIListenerList != null) {
+                for (int i = 0; i < mUpdateUIListenerList.size(); i++) {
+                    mUpdateUIListenerList.get(i).launchIncomingCallActivity();
+                }
+            }
+        }
+        else {
+            LinphoneManager.getLc().declineCall(incomingCall, Reason.Busy);
+            Log.e(TAG, "This user isn't allowed to receive IpCall");
+        }
     }
 
     public LinphoneCall getExtraValue(String key) {
@@ -742,7 +853,7 @@ public class LinphoneService extends Service {
 					UI_CALL_PACKAGE = packageName;
 				}
 			}catch(Exception e) {
-				Log.e(THIS_FILE, "Error while resolving package", e);
+				Log.e(TAG, THIS_FILE, "Error while resolving package", e);
 			}
 			*/
         }
@@ -766,22 +877,22 @@ public class LinphoneService extends Service {
 
         @Override
         public synchronized void onActivityCreated(Activity activity, Bundle savedInstanceState) {
-            Log.i("Activity created:" + activity);
+            Log.i(TAG, "Activity created:" + activity);
             if (!activities.contains(activity))
                 activities.add(activity);
         }
 
         @Override
         public void onActivityStarted(Activity activity) {
-            Log.i("Activity started:" + activity);
+            Log.i(TAG, "Activity started:" + activity);
         }
 
         @Override
         public synchronized void onActivityResumed(Activity activity) {
-            Log.i("Activity resumed:" + activity);
+            Log.i(TAG, "Activity resumed:" + activity);
             if (activities.contains(activity)) {
                 mRunningActivities++;
-                Log.i("runningActivities=" + mRunningActivities);
+                Log.i(TAG, "runningActivities=" + mRunningActivities);
                 checkActivity();
             }
 
@@ -789,10 +900,10 @@ public class LinphoneService extends Service {
 
         @Override
         public synchronized void onActivityPaused(Activity activity) {
-            Log.i("Activity paused:" + activity);
+            Log.i(TAG, "Activity paused:" + activity);
             if (activities.contains(activity)) {
                 mRunningActivities--;
-                Log.i("runningActivities=" + mRunningActivities);
+                Log.i(TAG, "runningActivities=" + mRunningActivities);
                 checkActivity();
             }
 
@@ -800,7 +911,7 @@ public class LinphoneService extends Service {
 
         @Override
         public void onActivityStopped(Activity activity) {
-            Log.i("Activity stopped:" + activity);
+            Log.i(TAG, "Activity stopped:" + activity);
         }
 
         @Override
@@ -810,7 +921,7 @@ public class LinphoneService extends Service {
 
         @Override
         public synchronized void onActivityDestroyed(Activity activity) {
-            Log.i("Activity destroyed:" + activity);
+            Log.i(TAG, "Activity destroyed:" + activity);
             if (activities.contains(activity)) {
                 activities.remove(activity);
             }

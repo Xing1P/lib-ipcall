@@ -113,6 +113,25 @@ public class CallLoadingIndicatorView extends View {
         return mIndicator;
     }
 
+    public void setIndicator(Indicator d) {
+        if (mIndicator != d) {
+            if (mIndicator != null) {
+                mIndicator.setCallback(null);
+                unscheduleDrawable(mIndicator);
+            }
+
+            mIndicator = d;
+            //need to set indicator color again if you didn't specified when you update the indicator .
+            setIndicatorColor(mIndicatorColor);
+            setAnimationDuration(mAnimationDuration);
+            setKeepOriginDelay(mKeepOriginDelay);
+            if (d != null) {
+                d.setCallback(this);
+            }
+            postInvalidate();
+        }
+    }
+
     /**
      * You should pay attention to pass this parameter with two way:
      * for example:
@@ -144,25 +163,6 @@ public class CallLoadingIndicatorView extends View {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
             e.printStackTrace();
-        }
-    }
-
-    public void setIndicator(Indicator d) {
-        if (mIndicator != d) {
-            if (mIndicator != null) {
-                mIndicator.setCallback(null);
-                unscheduleDrawable(mIndicator);
-            }
-
-            mIndicator = d;
-            //need to set indicator color again if you didn't specified when you update the indicator .
-            setIndicatorColor(mIndicatorColor);
-            setAnimationDuration(mAnimationDuration);
-            setKeepOriginDelay(mKeepOriginDelay);
-            if (d != null) {
-                d.setCallback(this);
-            }
-            postInvalidate();
         }
     }
 

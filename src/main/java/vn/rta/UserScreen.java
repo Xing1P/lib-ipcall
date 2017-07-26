@@ -34,10 +34,10 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.github.sundeepk.compactcalendarview.CompactCalendarView;
 import com.rta.ipcall.LinphoneManager;
+import com.rta.ipcall.LinphonePreferences;
 import com.rta.ipcall.LinphoneService;
-import com.rta.ipcall.ui.UpdateUIListener;
+import com.rta.ipcall.ui.OnUpdateUIListener;
 
 import org.apache.log4j.Logger;
 import org.linphone.core.LinphoneAddress;
@@ -60,10 +60,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import im.vector.activity.VectorRoomActivity;
 import permissions.dispatcher.NeedsPermission;
 import permissions.dispatcher.OnPermissionDenied;
 import permissions.dispatcher.RuntimePermissions;
-import vn.rta.cpms.application.Params;
+import vn.rta.cpms.common.activities.RtActionBarActivity;
 import vn.rta.cpms.communication.datamodel.media.UriImageRequestDescriptor;
 import vn.rta.cpms.communication.ui.AsyncImageView;
 import vn.rta.cpms.communication.util.ContentType;
@@ -71,17 +72,13 @@ import vn.rta.cpms.fragments.ProcessFragment;
 import vn.rta.cpms.fragments.StaffInfoFragment;
 import vn.rta.cpms.preference.AppSettingSharedPreferences;
 import vn.rta.cpms.services.ConnectionService;
-import vn.rta.cpms.services.DBService;
 import vn.rta.cpms.services.ManagerService;
 import vn.rta.cpms.services.ProcessDbHelper;
 import vn.rta.cpms.services.SwitchAppService;
 import vn.rta.cpms.services.UserListDbHelper;
-import vn.rta.cpms.services.model.Environment;
-import vn.rta.cpms.services.model.Form;
 import vn.rta.cpms.services.model.IpCallAccount;
 import vn.rta.cpms.services.model.SSConfig;
-import vn.rta.cpms.services.model.Schedule;
-import vn.rta.cpms.services.model.ValidLocation;
+import vn.rta.cpms.services.model.UserInfo;
 import vn.rta.cpms.tasks.ConnectionTask;
 import vn.rta.cpms.ui.MainViewInterface;
 import vn.rta.cpms.ui.TabbedFragment;
@@ -92,7 +89,6 @@ import vn.rta.cpms.ui.subscribedmodulelist.ModuleListFragment;
 import vn.rta.cpms.utils.Common;
 import vn.rta.cpms.utils.MessageUtils;
 import vn.rta.cpms.utils.NetworkMediaFileManager;
-import vn.rta.cpms.utils.StringUtil;
 import vn.rta.cpms.utils.SurveyCollectorUtils;
 import vn.rta.ipcall.ui.IncomingIPCallActivity;
 import vn.rta.piwik.Contacts;
@@ -113,42 +109,30 @@ import vn.rta.survey.android.utilities.Utils;
  * @author DungVu (dungvu@rta.vn) & Vu Hoang (vuhoang@rta.vn)
  */
 @RuntimePermissions
-public class UserScreen extends RtDimmableActivity
+public class UserScreen extends RtActionBarActivity
         implements TaskListener, MainViewInterface {
-    private final Logger log = Logger.getLogger(UserScreen.class);
-    private static final String TAG = UserScreen.class.getSimpleName();
-
-    // Alarm action for midnight (so we can update the date display).
-    private static final String KEY_SELECTED_TAB = "selected_tab";
     public static final String SELECT_TAB_INTENT_EXTRA = "userscreen.select.tab";
-
-    private static final boolean EXIT = true;
-    public static final String FRAGMENT_ID = "fragment_id";
-    public static final int FRAGMENT_NOTIFICATION = 1;
     public static final String IS_RELOAD_SCHEDULE = "reload_schedule";
-    public static final String[] NECESSARY_PERMISSIONS = new String[]{
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.ACCESS_FINE_LOCATION
-    };
-
     public static final int TAB_HOME = 0;
     public static final int TAB_COMMUNICATION = 1;
     public static final int TAB_NOTIFICATION = 2;
     public static final int TAB_NOTE = 3;
     public static final int TAB_STAFF_INFO = 4;
     public static final int TAB_COUNT = TAB_STAFF_INFO + 1;
-
+    private static final String TAG = UserScreen.class.getSimpleName();
+    // Alarm action for midnight (so we can update the date display).
+    private static final String KEY_SELECTED_TAB = "selected_tab";
+    private static final boolean EXIT = true;
+    private final Logger log = Logger.getLogger(UserScreen.class);
+    OnUpdateUIListener updateUIListener;
     private View mRootContainer;
     private AppBarLayout mAppBarLayout;
     private Toolbar mToolbar;
     private TabLayout mTabLayout;
     private CollapsingToolbarLayout mCollapsingToolbarLayout;
-    private SearchAdapter mSearchAdapter;
-
     private ViewPager mViewPager;
     private TabsAdapter mTabsAdapter;
     private int mSelectedTab;
-
     private TextView mHeaderBrandText;
     private TextView mHeaderStaffText;
     private AsyncImageView mHeaderImage;
@@ -158,13 +142,6 @@ public class UserScreen extends RtDimmableActivity
     private CollapsingToolbarLayout mTabCollapsingToolbarLayout;
     private Toolbar mTabToolbar;
     private ViewGroup mTabExpandingContainer;
-//    private View mSecondTitleContainerView;
-//    private TextView mTabTitleTextView;
-//    private ImageView mTabTitleIcon;
-//    private ActionMenuView mTabActionMenu;
-    private boolean mSecondAppBarExpanded = false;
-
-    private CompactCalendarView mCalendarView;
 
     private AlertDialog mAlertDialog;
     private Dialog continueEditDialog;
@@ -172,12 +149,6 @@ public class UserScreen extends RtDimmableActivity
     private SharedPreferences mAdminPreferences;
     private boolean isReloadSchedule = false;
     private ConnectionTask taskUpdateSchedule;
-
-    /**
-     * We're tracking the conversation list for handling
-     * rt-messaging module login service behaviors.
-     */
-    private ConversationListFragment mConversationListFragment;
 
     Fragment getSelectedFragment() {
         return mTabsAdapter.getItem(mSelectedTab);
@@ -194,7 +165,6 @@ public class UserScreen extends RtDimmableActivity
 
         final TabLayout.Tab notificationTab = mTabLayout.newTab();
         notificationTab.setIcon(R.drawable.ic_tab_notifications);
-//        mTabsAdapter.addTab(notificationTab, NotificationListFragment.class, TAB_NOTIFICATION);
         mTabsAdapter.addTab(notificationTab, AgendaFragment.class, TAB_NOTIFICATION);
 
         final TabLayout.Tab noteTab = mTabLayout.newTab();
@@ -223,6 +193,12 @@ public class UserScreen extends RtDimmableActivity
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        Log.d(TAG, intent.toString());
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         MultiDex.install(this);
         super.onCreate(savedInstanceState);
@@ -240,6 +216,12 @@ public class UserScreen extends RtDimmableActivity
             int tab = intent.getIntExtra(SELECT_TAB_INTENT_EXTRA, -1);
             if (tab != -1) {
                 mSelectedTab = tab;
+            }
+
+            final String navActivity = intent.getStringExtra("nav.activity");
+            if (navActivity != null && navActivity.equals(VectorRoomActivity.class.getName())) {
+                mSelectedTab = TAB_COMMUNICATION;
+                intent.removeExtra("nav.activity");
             }
         }
 
@@ -268,6 +250,11 @@ public class UserScreen extends RtDimmableActivity
             }
         });
 
+        mTabAppBarLayout = (AppBarLayout) findViewById(R.id.tab_appBarLayout);
+        mTabCollapsingToolbarLayout = (CollapsingToolbarLayout) mTabAppBarLayout.findViewById(R.id.tab_collapsing_toolbar);
+        mTabToolbar = (Toolbar) mTabCollapsingToolbarLayout.findViewById(R.id.tab_toolbar);
+        mTabExpandingContainer = (ViewGroup) mTabCollapsingToolbarLayout.findViewById(R.id.tab_expanding_container);
+
         if (mTabsAdapter == null) {
             mViewPager = (ViewPager) findViewById(R.id.supervisor_paper);
             // Keep all four tabs to minimize jank.
@@ -279,7 +266,6 @@ public class UserScreen extends RtDimmableActivity
             mTabLayout.setupWithViewPager(mViewPager);
             createTabs();
         }
-
 
         mHeaderBrandText.setText(RTASurvey.getInstance().getOrgBrand());
         String staff = Common.getStaffInfo(this, R.string.staffInfo_format_short);
@@ -293,43 +279,6 @@ public class UserScreen extends RtDimmableActivity
         } else {
             finish();
         }
-        mTabLayout.setOnTabSelectedListener(new TabLayout.ViewPagerOnTabSelectedListener(mViewPager) {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                super.onTabSelected(tab);
-                String title;
-                switch (tab.getPosition()) {
-                    case TAB_HOME:
-                        title = getString(R.string.tracking_tab_home);
-                        break;
-                    case TAB_COMMUNICATION:
-                        title = getString(R.string.tracking_tab_communication);
-                        break;
-                    case TAB_NOTIFICATION:
-                        title = getString(R.string.tracking_tab_notifications);
-                        break;
-                    case TAB_NOTE:
-                        title = getString(R.string.tracking_tab_documents);
-                        break;
-                    case TAB_STAFF_INFO:
-                        title = getString(R.string.tracking_tab_staff_info);
-                        break;
-                    default:
-                        title = "null";
-                }
-                PiwikTrackerManager.newInstance().trackTabChange(UserScreen.class.getSimpleName(), 4, Contacts.HOME, tab.getPosition(), title);
-            }
-        });
-
-        mTabAppBarLayout = (AppBarLayout) findViewById(R.id.tab_appBarLayout);
-        mTabCollapsingToolbarLayout = (CollapsingToolbarLayout) mTabAppBarLayout.findViewById(R.id.tab_collapsing_toolbar);
-        mTabToolbar = (Toolbar) mTabCollapsingToolbarLayout.findViewById(R.id.tab_toolbar);
-        mTabExpandingContainer = (ViewGroup) mTabCollapsingToolbarLayout.findViewById(R.id.tab_expanding_container);
-//        mSecondTitleContainerView = mTabToolbar.findViewById(R.id.tab_title_container);
-//        mTabTitleTextView = (TextView) mSecondTitleContainerView.findViewById(R.id.tab_title);
-//        mTabTitleIcon = (ImageView) mSecondTitleContainerView.findViewById(R.id.tab_title_icon);
-//        mTabActionMenu = (ActionMenuView) mTabToolbar.findViewById(R.id.tab_action_menu);
-//        mCalendarView = (CompactCalendarView) findViewById(R.id.calendar_view);
     }
 
     @NeedsPermission({
@@ -359,44 +308,7 @@ public class UserScreen extends RtDimmableActivity
                         RTASurvey pre = RTASurvey.getInstance();
 
                         // Get synchronize schedule (interval) in server
-                        if (RTASurvey.getInstance().getNewestScheduleId() == -1) {
-                            String formIdForUpdate = RTASurvey.getInstance().getFormId();
-                            String res;
-                            if (formIdForUpdate.equals("")) {
-                                res = connection.synchronize(context, pre.getServerUrl(),
-                                        pre.getServerKey(), pre.getDeviceId());
-                            } else {
-                                res = connection.updateSchedule(
-                                        activity, pre.getServerUrl(), pre.getServerKey(),
-                                        pre.getDeviceId(), formIdForUpdate);
-                                if (res == null) {
-                                    res = connection.synchronize(context, pre.getServerUrl(),
-                                            pre.getServerKey(), pre.getDeviceId());
-                                }
-                            }
-
-                            // Parse JSON result to Schedule
-                            Schedule schedule = (Schedule) StringUtil.json2Object(res,
-                                    Schedule.class);
-
-                            // Default value for status
-                            if (schedule != null) {
-                                schedule.setStatus(Params.DETECT_ACTIVE);
-                                log.info("" + schedule);
-
-                                // Add sample data for Reliable rate checking (temporary)
-                                List<Environment> envs = new ArrayList<Environment>();
-                                List<ValidLocation> fields = new ArrayList<ValidLocation>();
-                                List<Form> forms = new ArrayList<Form>();
-
-                                schedule.setEnvironments(envs);
-                                schedule.setFields(fields);
-                                schedule.setForms(forms);
-
-                                // save to fadata.db
-                                DBService.getInstance().saveSchedule(schedule);
-                            }
-                        }
+                        // [REMOVED]
 
                         //get server config information
                         String mainUser = UserListDbHelper.getInstance().getMainUsername();
@@ -426,85 +338,102 @@ public class UserScreen extends RtDimmableActivity
         mAdminPreferences = this.getSharedPreferences(
                 _AdminPreferencesActivity.ADMIN_PREFERENCES, 0);
 
-        mTabLayout.setOnTabSelectedListener(new TabLayout.ViewPagerOnTabSelectedListener(mViewPager) {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                super.onTabSelected(tab);
-                Common.hideKeyboard(UserScreen.this, mTabLayout);
-
-                /*if (tab.getPosition() != TAB_HOME) {
-                    if (MainMenuFragment.isRunning) {
-                        MainMenuFragment.stopCheckNetwork();
-                    }
-                    mAppBarLayout.setExpanded(false);
-                } else {
-                    Fragment homeFragment = getFragmentOfAdapter(TAB_HOME);
-                    if (homeFragment != null && homeFragment instanceof MainMenuFragment) {
-                        MainMenuFragment f = (MainMenuFragment) homeFragment;
-                        if (f.isAdded()) {
-                            f.startCheckNetwork();
-                        }
-                    }
-                }*/
-                if (tab.getPosition() != TAB_HOME) {
-                    mAppBarLayout.setExpanded(false);
-                }
-                if (tab.getPosition() == TAB_STAFF_INFO) {
-                    StaffInfoFragment f = (StaffInfoFragment) getFragmentOfAdapter(TAB_STAFF_INFO);
-                    if (f != null && f.isAdded())
-                        f.startUpdateTask();
-                }
-                if (tab.getPosition() != TAB_STAFF_INFO) {
-                    StaffInfoFragment.stopAllTask();
-                }
-//                if (tab.getPosition() != TAB_NOTE) {
-//                    NoteListFragment f = (NoteListFragment) getFragmentOfAdapter(TAB_NOTE);
-//                    if (f != null && f.isAdded())
-//                        f.updateLayout();
-//                }
-            }
-        });
-
         // start a foreground service
         Intent i = new Intent(this, ManagerService.class);
         i.setAction(ManagerService.ACTION_START_ALLSERVICE);
         startService(i);
-        final IpCallAccount ipCallAccount = Common.getUserInfo(this).getIpcall();
-        if (!LinphoneService.isReady() && ipCallAccount != null) {
-            startService(new Intent(Intent.ACTION_MAIN).setClass(this, LinphoneService.class));
-            LinphoneManager.setAllowIncomingCall(true);
-            LinphoneService.setOnUpdateUIListener(new UpdateUIListener() {
-                @Override
-                public void updateUIByServiceStatus(boolean serviceConnected) {
-                   if (serviceConnected) {
-                       LinphoneManager.getInstance().prepareLogIn();
-                       LinphoneManager.getInstance().genericLogIn(ipCallAccount.getUser(), ipCallAccount.getPassword(), null, ipCallAccount.getUrl(), LinphoneAddress.TransportType.LinphoneTransportUdp);
-
-                       LinphoneService.instance().setForegroundNotif(NotificationCreator.getNotification(LinphoneService.instance()));
-                       LinphoneService.instance().setMainNotifId(NotificationCreator.getNotificationId());
-                       LinphoneService.instance().startForegroundNotification();
-                   }
-
-                    //Enable call status in user information fragment
-                    ((StaffInfoFragment) mTabsAdapter.getItem(TAB_STAFF_INFO)).setEnableIPCallStatus(serviceConnected);
+        UserInfo userInfo = Common.getUserInfo(this);
+        if (userInfo != null) {
+            //If user existed -> get ipcall account
+            final IpCallAccount ipCallAccount = userInfo.getIpcall();
+            if (ipCallAccount != null
+                    && ipCallAccount.getUser() != null && !ipCallAccount.getUser().isEmpty()
+                    && ipCallAccount.getPassword() != null && !ipCallAccount.getPassword().isEmpty()) {
+                //If service have started before and still running
+                // => config information that allow receive IPCall and refresh registration
+                if (LinphoneService.isReady()) {
+                    LinphoneManager.setAllowIncomingCall(true);
+                    try {
+                        if (NetworkHelper.newInstance(UserScreen.this).isOnline()) {
+                            LinphoneManager.getLc().refreshRegisters();
+                        }
+                        else {
+                            Toast.makeText(UserScreen.this, getString(R.string.no_internet), Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    catch (IllegalStateException ise) {
+                        ise.printStackTrace();
+                    }
+                }
+                else {
+                    //LinphoneService is not ready -> start it
+                    startService(new Intent(Intent.ACTION_MAIN).setClass(this, LinphoneService.class));
+                    LinphoneManager.setAllowIncomingCall(true);
                 }
 
-                @Override
-                public void updateToCallWidget(boolean isCalled) {
-
+                if (updateUIListener != null && LinphoneService.isReady()) {
+                    LinphoneService.removeOnUpdateUIListener(updateUIListener);
                 }
+                updateUIListener = new OnUpdateUIListener() {
+                    @Override
+                    public void registrationState(boolean isConnected, String statusMessage) {
+                        ((StaffInfoFragment) mTabsAdapter.getItem(TAB_STAFF_INFO)).setEnableIPCallStatus(isConnected);
+                    }
 
-                @Override
-                public void launchIncomingCallActivity() {
-                    Intent intent = new Intent(getApplicationContext(), IncomingIPCallActivity.class);
-                    startActivity(intent);
-                }
+                    @Override
+                    public void updateUIByServiceStatus(boolean serviceConnected) {
+                        if (serviceConnected) {
+                            //If service destroy by form exit:
+                            // ** not allow incoming call: there is 1 account left (form acc)
+                            // ** allow incoming call but not have global account: 1 account left (from form)
+                            //If service destroy by stop app (allow incoming call, have global acc and have form acc)
+                            // ** form acc already remove in ipcallmanager, now remove the global one.
+                            // ==> only 1 account need to remove.
+                            LinphonePreferences prefs = LinphonePreferences.instance();
+                            int count = prefs.getAccountCount();
 
-                @Override
-                public void dismissCallActivity() {
+                            try {
+                                //New plan: Delete all account
+                                for (int i = 0; i < count; i++) {
+                                    prefs.deleteAccount(i);
+                                }
+                                LinphoneManager.getLc().clearAuthInfos();
+                                LinphoneManager.getLc().clearProxyConfigs();
+                            }
+                            catch (Exception ex) {
+                                Toast.makeText(UserScreen.this, "Failed to sign out old account!", Toast.LENGTH_SHORT).show();
+                                ex.printStackTrace();
+                            }
 
-                }
-            });
+                            LinphoneManager.getInstance().genericLogIn(ipCallAccount.getUser(),
+                                    ipCallAccount.getPassword(),
+                                    null,
+                                    ipCallAccount.getUrl(),
+                                    LinphoneAddress.TransportType.LinphoneTransportUdp);
+                            LinphoneService.instance().setForegroundNotif(NotificationCreator.getNotification(LinphoneService.instance()));
+                            LinphoneService.instance().setMainNotifId(NotificationCreator.getNotificationId());
+                            LinphoneService.instance().startForegroundNotification();
+                        }
+                    }
+
+                    @Override
+                    public void updateToCallWidget(boolean isCalled) {
+
+                    }
+
+                    @Override
+                    public void launchIncomingCallActivity() {
+                        Intent intent = new Intent(getApplicationContext(), IncomingIPCallActivity.class);
+                        startActivity(intent);
+                    }
+
+                    @Override
+                    public void dismissCallActivity() {
+
+                    }
+                };
+                LinphoneService.addOnUpdateUIListener(updateUIListener);
+            }
         }
 
         RTASurvey pre = RTASurvey.getInstance();
@@ -544,11 +473,6 @@ public class UserScreen extends RtDimmableActivity
             }
         }
 
-    }
-
-    private void setSecondAppBarExpand(boolean expand, boolean animate) {
-        mSecondAppBarExpanded = expand;
-        mAppBarLayout.setExpanded(expand, animate);
     }
 
     @Override
@@ -676,7 +600,7 @@ public class UserScreen extends RtDimmableActivity
             }
         }
 
-        if (app.isGCMRegisteredFlag()) {
+        /*if (app.isGCMRegisteredFlag()) {
             Intent intent = new Intent(this, ManagerService.class);
             if (!Common.checkPlayServices(this)) {
                 intent.setAction(Common.isConnect(this) ? ManagerService.ACTION_START_RCM : ManagerService.ACTION_STOP_RCM);
@@ -684,12 +608,9 @@ public class UserScreen extends RtDimmableActivity
                 intent.setAction(ManagerService.ACTION_STOP_RCM);
             }
             startService(intent);
-        }
+        }*/
         if (AppSettingSharedPreferences.getInstance(this).getKey(AppSettingSharedPreferences.KEY_APP_UPDATE))
             Common.checkAppUpdate(this);
-        if (mViewPager.getCurrentItem() == TAB_STAFF_INFO) {
-            ((StaffInfoFragment) mTabsAdapter.getItem(TAB_STAFF_INFO)).startUpdateTask();
-        }
     }
 
     @SuppressWarnings("deprecation")
@@ -765,6 +686,10 @@ public class UserScreen extends RtDimmableActivity
         if (taskUpdateSchedule != null) {
             taskUpdateSchedule.cancel(true);
         }
+
+        if (updateUIListener != null)
+            LinphoneService.removeOnUpdateUIListener(updateUIListener);
+
         super.onDestroy();
     }
 
@@ -961,31 +886,45 @@ public class UserScreen extends RtDimmableActivity
         mTabAppBarLayout.setExpanded(false, false);
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 200) {
+            if (resultCode == RESULT_OK) {
+                Intent intent = new Intent(this, SwitchAppService.class);
+                startService(intent);
+            }
+        }
+    }
+
+    private void sendScreenViewForChildrenFragment(int position) {
+        PiwikTrackerManager.newInstance().trackTabChange(UserScreen.class.getSimpleName(), 4,
+                Contacts.HOME, position, getFragmentTagForPosition(position));
+    }
+
+    private String getFragmentTagForPosition(int position) {
+        switch (position) {
+            case TAB_HOME:
+                return "Home";
+            case TAB_COMMUNICATION:
+                return "Communication";
+            case TAB_NOTIFICATION:
+                return "Documents";
+            case TAB_NOTE:
+                return "Notifications";
+            case TAB_STAFF_INFO:
+                return "Profile";
+        }
+        return null;
+    }
+
     private class TabsAdapter extends FragmentPagerAdapter implements ViewPager.OnPageChangeListener {
         private static final String KEY_TAB_POSITION = "tab_position";
 
         private final Object mScrollingLock = new Object();
-
-        final class TabInfo {
-            private final Class<?> clss;
-            private final Bundle args;
-
-            TabInfo(Class<?> _class, int position) {
-                clss = _class;
-                args = new Bundle();
-                args.putInt(KEY_TAB_POSITION, position);
-            }
-
-            public int getPosition() {
-                return args.getInt(KEY_TAB_POSITION, 0);
-            }
-        }
-
         private final ViewPager mPager;
-
         private final List<TabInfo> mTabs = new ArrayList<>(TAB_COUNT /* number of fragments */);
         private final Set<String> mFragmentTags = new HashSet<>(TAB_COUNT /* number of fragments */);
-
         public TabsAdapter(ViewPager pager) {
             super(getFragmentManager());
             mPager = pager;
@@ -1030,7 +969,7 @@ public class UserScreen extends RtDimmableActivity
 
         @Override
         public void onPageSelected(int position) {
-            mTabLayout.getTabAt(position).select();
+            sendScreenViewForChildrenFragment(position);
             notifyPageChanged(position);
 
             mSelectedTab = position;
@@ -1101,16 +1040,20 @@ public class UserScreen extends RtDimmableActivity
             mFragmentTags.remove(frag.getTag());
         }
 
-    }
+        final class TabInfo {
+            private final Class<?> clss;
+            private final Bundle args;
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 200) {
-            if (resultCode == RESULT_OK) {
-                Intent intent = new Intent(this, SwitchAppService.class);
-                startService(intent);
+            TabInfo(Class<?> _class, int position) {
+                clss = _class;
+                args = new Bundle();
+                args.putInt(KEY_TAB_POSITION, position);
+            }
+
+            public int getPosition() {
+                return args.getInt(KEY_TAB_POSITION, 0);
             }
         }
+
     }
 }

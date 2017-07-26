@@ -22,6 +22,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
@@ -33,7 +34,6 @@ import com.rta.ipcall.LinphoneService;
 
 import org.linphone.core.LinphoneCore;
 import org.linphone.core.LinphoneCoreFactory;
-import org.linphone.mediastream.Log;
 
 import vn.rta.survey.android.R;
 
@@ -97,7 +97,7 @@ public class Digit extends Button implements AddressAware {
 
         private boolean linphoneServiceReady() {
             if (!LinphoneService.isReady()) {
-                Log.w("Service is not ready while pressing digit");
+                Log.w(Digit.class.getSimpleName(), "Service is not ready while pressing digit");
                 Toast.makeText(getContext(), getContext().getString(R.string.skipable_error_service_not_ready), Toast.LENGTH_SHORT).show();
                 return false;
             }
@@ -170,7 +170,7 @@ public class Digit extends Button implements AddressAware {
 
 			/*
             if (CallActivity.isInstanciated()) {
-				CallActivity.instance().resetControlsHidingCallBack();
+				CallActivity.getInstance().resetControlsHidingCallBack();
 			}
 			*/
 

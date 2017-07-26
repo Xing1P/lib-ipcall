@@ -138,34 +138,23 @@ import vn.rta.survey.android.provider.SamplingResponse;
  * @since February 26 2016
  */
 public class ProcessRCMCommandService extends IntentService {
-    private static final String TAG = "ProcessRCMCommand";
-
-    private final Logger log = Logger.getLogger(ProcessRCMCommandService.class);
-
-    // notification and task reminder alarm
-    public static long snoozeTime = 5 * Params.MINUTE;    // default snoozeTime
     public static final int MIN_NTF_SOUND_TYPE = 1;
     public static final int MAX_NTF_SOUND_TYPE = 5;
-
     // clean pilot
     public static final int CLEAN_FORMS = 0;
     public static final int CLEAN_LIB = 1;
     public static final int CLEAN_LOG = 2;
-
     // SS resource transferring type
     public static final int TYPE_DOWNLOAD = 0;
     public static final int TYPE_UPLOAD = 1;
-
     // download resource JSON message
     public final static String KEY_DIRPATH = "file_path";
     public final static String KEY_LINK = "file_link";
     public final static String KEY_OPTION = "action";
     public final static String OPTION_RENAME = "rename";
     public final static String OPTION_OVERWRITE = "overwrite";
-
     //report types
     public final static String REPORT_INSTANCE_STT = "instanceStt";
-
     //Intent action for local broadcast receiver
     public static final String NTF_COUNTER_UPDATE = "vn.rta.cpms.android.ntf.update";
     public static final String TSK_COUNTER_UPDATE = "vn.rta.cpms.android.tsk.update";
@@ -174,9 +163,280 @@ public class ProcessRCMCommandService extends IntentService {
     public static final String REPORT_COUNTER_UPDATE = "vn.rta.cpms.android.report.update";
     public static final String REPORT_UPDATE_UI = "vn.rta.cpms.android.report.update.ui";
     public static final String UPDATE_MAIN_ITEMS = "vn.rta.cpms.android.report.update.main.items";
+    private static final String TAG = "ProcessRCMCommand";
+    // notification and task reminder alarm
+    public static long snoozeTime = 5 * Params.MINUTE;    // default snoozeTime
+    private final Logger log = Logger.getLogger(ProcessRCMCommandService.class);
 
     public ProcessRCMCommandService() {
         super(TAG);
+    }
+
+    private static void makeNotificationSound(Context context, int soundId) {
+        if (soundId < MIN_NTF_SOUND_TYPE || soundId > MAX_NTF_SOUND_TYPE) {
+            soundId = MIN_NTF_SOUND_TYPE;
+        }
+        Uri notification = Uri.parse("android.resource://" + BuildConfig.APPLICATION_ID + "/raw/sound" + soundId);
+        MediaPlayer player = MediaPlayer.create(context, notification);
+        player.start();
+    }
+
+    public static void broadcastUIUpdate(Context context, Intent intent) {
+        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+    }
+
+    public static void broadcastUIUpdate(Context context, String action) {
+        broadcastUIUpdate(context, new Intent(action));
+    }
+
+    private static void reportRCMCommand(Context context, String id, String status) {
+        RCMStatusReportService.requestService(context, id, status);
+    }
+
+    public static void validateFormFamilyFromAsyncTask(Context context, String formID, String version) {
+        new ConnectionTask(context) {
+            @Override
+            protected List<FormInFamily> doInBackground(String... params) {
+                String formID = params[0], version = params[1];
+                return ConnectionService.getInstance().getFormFamily(context,
+                        RTASurvey.getInstance().getServerUrl(),
+                        RTASurvey.getInstance().getServerKey(),
+                        formID, version);
+            }
+
+            @Override
+            protected void onPostExecute(Object result) {
+                super.onPostExecute(result);
+                if (result != null && result instanceof List) {
+                    List<FormInFamily> family = (List<FormInFamily>) result;
+                    for (FormInFamily f : family) {
+                        try {
+                            if (f.isAvailable == 1) {
+                                SurveyCollectorUtils.lockForm(context, f.formID, f.version, false);
+                                SurveyCollectorUtils.handleOldForms(context, f.formID, f.version);
+                            } else {
+                                SurveyCollectorUtils.lockForm(context, f.formID, f.version, true);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }.execute(formID, version);
+    }
+
+    /**
+     * @return true if formID-version is locked
+     */
+    private static boolean validateFormFamily(Context context, String formID, String version) {
+        List<FormInFamily> family = ConnectionService.getInstance().getFormFamily(context,
+                RTASurvey.getInstance().getServerUrl(),
+                RTASurvey.getInstance().getServerKey(),
+                formID, version);
+        boolean lockItself = false;
+        if (family != null) {
+            for (FormInFamily f : family) {
+                try {
+                    if (f.isAvailable == 1) {
+                        SurveyCollectorUtils.lockForm(context, f.formID, f.version, false);
+                    } else {
+                        lockItself = lockItself || (formID.equals(f.formID) && version.equals(f.version));
+                        SurveyCollectorUtils.lockForm(context, f.formID, f.version, true);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return lockItself;
+    }
+
+    public static void reportReceivedMessage(Context context, final String mid) {
+        if (!TextUtils.isEmpty(mid)) {
+            reportRCMCommand(context, mid, Params.RCM_STATUS_RECEIVED);
+        }
+    }
+
+    public static void reportRCMCommandExeFailed(Context context, final String mid) {
+        if (!TextUtils.isEmpty(mid)) {
+            reportRCMCommand(context, mid, Params.RCM_STATUS_FAILED);
+        }
+    }
+
+    public static void reportRCMCommandExeSuccess(Context context, final String mid) {
+        if (!TextUtils.isEmpty(mid)) {
+            reportRCMCommand(context, mid, Params.RCM_STATUS_SUCCESS);
+        }
+    }
+
+    /**
+     * Issues a notification for App settings
+     */
+    private static void notifyNewAppSettings(Context context) {
+        // Waking up mobile if it is sleeping
+        WakeLocker.acquire(context);
+
+        NotificationCompat.Style style = new NotificationCompat.BigTextStyle()
+                .setBigContentTitle(context.getString(R.string.rta_app_name))
+                .bigText(context.getString(R.string.app_settings_update_message_full))
+                .setSummaryText(context.getString(R.string.app_settings_update_message));
+
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context)
+                .setSmallIcon(R.drawable.ic_stat_default)
+                .setContentTitle(context.getString(R.string.rta_app_name))
+                .setContentText(context.getString(R.string.app_settings_update_message))
+                .setStyle(style)
+                .setAutoCancel(true);
+
+        Intent appIntent = new Intent(context, SplashScreenActivity.class);
+        mBuilder.setContentIntent(MessageUtils.getPendingIntentWithParentStack(context, appIntent, 0));
+        NotificationManager mNotificationManager = (NotificationManager) context
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+        Notification n = mBuilder.build();
+        mNotificationManager.notify(R.string.app_settings_update_message, n);
+
+        // update the background tracking works
+        Intent serviceIntent = new Intent(context, ManagerService.class);
+        serviceIntent.setAction(ManagerService.ACTION_UPDATE_SCHEDULE);
+        context.startService(serviceIntent);
+
+        // Releasing wake lock
+        WakeLocker.release();
+    }
+
+    /**
+     * Issues a notification with alarm for Notification
+     */
+    private static void notifyNewNotification(Context context, long intervalMillis) {
+        // Waking up mobile if it is sleeping
+        WakeLocker.acquire(context);
+
+        NotificationCompat.Style style = null;
+        List<SSInteraction> list = DBService.getInstance().getNotifications(false);
+        if (list == null || list.size() == 0) {
+            return;
+        }
+
+        String senderText = context.getString(R.string.cpms_ntf_from_sender,
+                list.get(0).sender);
+
+        if (list.size() == 1) {
+            style = new NotificationCompat.BigTextStyle()
+                    .setBigContentTitle(senderText)
+                    .setSummaryText(context.getString(R.string.menu_item_ntf))
+                    .bigText(Jsoup.parse(list.get(0).message).text());
+        } else {
+            int maxLine = 3, iLine = 0;
+            String summaryText = list.size() > maxLine ?
+                    context.getString(R.string.cpms_ntf_number_of_news_more, list.size() - maxLine) :
+                    context.getString(R.string.menu_item_ntf);
+            style = new NotificationCompat.InboxStyle()
+                    .setBigContentTitle(context.getString(R.string.cpms_ntf_number_of_news, list.size()))
+                    .setSummaryText(summaryText);
+            while (iLine < list.size() && iLine < maxLine) {
+                SSInteraction i = list.get(iLine);
+                String line = String.format("%s -> %s", i.sender,
+                        Jsoup.parse(i.message).text());
+                ((NotificationCompat.InboxStyle) style).addLine(line);
+                iLine++;
+            }
+        }
+
+        String smallContentText = list.size() == 1 ? senderText
+                : context.getString(R.string.cpms_ntf_number_of_news, list.size());
+
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
+                context.getApplicationContext())
+                .setSmallIcon(R.drawable.cpms_main_ntf)
+                .setContentTitle(context.getString(R.string.menu_item_ntf))
+                .setContentText(smallContentText)
+                .setStyle(style);
+
+        Intent appIntent = new Intent(context, NotificationListActivity.class);
+        mBuilder.setContentIntent(MessageUtils.getPendingIntentWithParentStack(context, appIntent, 0));
+        NotificationManager mNotificationManager = (NotificationManager) context
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+
+        Notification n = mBuilder.build();
+        if (intervalMillis > 0) {
+            MessageUtils.snoozeTime = intervalMillis;
+            mNotificationManager.cancel(MessageUtils.NTF_ID_FOR_NTFICATION);
+            mNotificationManager.notify(MessageUtils.SOUND_NTF_ID_FOR_NTFICATION, n);
+        } else {
+            mNotificationManager.cancel(MessageUtils.SOUND_NTF_ID_FOR_NTFICATION);
+            mNotificationManager.notify(MessageUtils.NTF_ID_FOR_NTFICATION, n);
+        }
+
+        // Releasing wake lock
+        WakeLocker.release();
+    }
+
+    /**
+     * Issues a notification with alarm for TaskReminder
+     */
+    private static void notifyNewTask(Context context, long intervalMillis) {
+        // Waking up mobile if it is sleeping
+        WakeLocker.acquire(context);
+
+        NotificationCompat.Style style = null;
+        List<SSInteraction> list = DBService.getInstance().getTaskReminders(false);
+        if (list == null || list.size() == 0) {
+            return;
+        }
+
+        String senderText = context.getString(R.string.cpms_tsk_from_sender,
+                list.get(0).sender);
+
+        if (list.size() == 1) {
+            style = new NotificationCompat.BigTextStyle()
+                    .setBigContentTitle(senderText)
+                    .setSummaryText(context.getString(R.string.menu_item_task))
+                    .bigText(Jsoup.parse(list.get(0).message).text());
+        } else {
+            int maxLine = 3, iLine = 0;
+            String summaryText = list.size() > maxLine ?
+                    context.getString(R.string.cpms_tsk_number_of_news_more, list.size() - maxLine) :
+                    context.getString(R.string.menu_item_task);
+            style = new NotificationCompat.InboxStyle()
+                    .setBigContentTitle(context.getString(R.string.cpms_tsk_number_of_news, list.size()))
+                    .setSummaryText(summaryText);
+            while (iLine < list.size() && iLine < maxLine) {
+                SSInteraction i = list.get(iLine);
+                String line = String.format("%s -> %s", i.sender,
+                        Jsoup.parse(i.message).text());
+                ((NotificationCompat.InboxStyle) style).addLine(line);
+                iLine++;
+            }
+        }
+
+        String smallContentText = list.size() == 1 ? senderText
+                : context.getString(R.string.cpms_tsk_number_of_news, list.size());
+
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
+                context.getApplicationContext())
+                .setSmallIcon(R.drawable.cpms_main_task)
+                .setContentTitle(context.getString(R.string.menu_item_task))
+                .setContentText(smallContentText)
+                .setStyle(style);
+
+        Intent appIntent = new Intent(context, NotificationListActivity.class);
+        mBuilder.setContentIntent(MessageUtils.getPendingIntentWithParentStack(context, appIntent, 0));
+        NotificationManager mNotificationManager = (NotificationManager) context
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+
+        Notification n = mBuilder.build();
+        if (intervalMillis > 0) {
+            MessageUtils.snoozeTime = intervalMillis;
+            mNotificationManager.cancel(MessageUtils.NTF_ID_FOR_TASKREMINDER);
+            mNotificationManager.notify(MessageUtils.SOUND_NTF_ID_FOR_TASKREMINDER, n);
+        } else {
+            mNotificationManager.cancel(MessageUtils.SOUND_NTF_ID_FOR_TASKREMINDER);
+            mNotificationManager.notify(MessageUtils.NTF_ID_FOR_TASKREMINDER, n);
+        }
+
+        // Releasing wake lock
+        WakeLocker.release();
     }
 
     @Override
@@ -405,7 +665,7 @@ public class ProcessRCMCommandService extends IntentService {
                         .getString(R.string.cpms_update_family_media), "");
                 downloadPreloadMediaFile(context, mid, json, true);
 
-            } else if (message.startsWith(context.getString(R.string.reset_rcm_checking))) {
+            }/* else if (message.startsWith(context.getString(R.string.reset_rcm_checking))) {
                 long seconds = RTASurvey.getInstance().getRCMCheckPeriod();
                 try {
                     seconds = Long.parseLong(
@@ -426,7 +686,7 @@ public class ProcessRCMCommandService extends IntentService {
                 intent.setAction((RTASurvey.getInstance().isGCMRegisteredFlag()
                         && Common.checkPlayServices(context)) ? ManagerService.ACTION_STOP_RCM : ManagerService.ACTION_START_RCM);
                 context.startService(intent);
-            } else if (message.startsWith(context.getString(R.string.download_resource))) {
+            } */else if (message.startsWith(context.getString(R.string.download_resource))) {
                 String json = message.replaceFirst(context
                         .getString(R.string.download_resource), "");
                 transferResource(context, json, mid, TYPE_DOWNLOAD);
@@ -783,33 +1043,6 @@ public class ProcessRCMCommandService extends IntentService {
                 String json = message.replaceFirst(context.getString(R.string.followup_instance_4sup), "");
                 createFollowupInstanceByTask(context, mid, json, true);
 
-            } else if (message.equalsIgnoreCase(context
-                    .getString(R.string.update_schedule))) { // update schedule
-                reportReceivedMessage(context, mid);
-                if (!RTASurvey.getInstance().isTrackingServiceLocked()) {
-                    Intent serviceIntent = new Intent(context, ManagerService.class);
-                    serviceIntent.setAction(ManagerService.ACTION_UPDATE_SCHEDULE);
-                    context.startService(serviceIntent);
-                } else {
-                    log.error("ERROR: The tracking service has been locked.");
-                    reportRCMCommandExeFailed(context, mid);
-                }
-
-            } else if (message.startsWith(context
-                    .getString(R.string.update_schedule_by_formId))) { // update schedule by formId
-                reportReceivedMessage(context, mid);
-                if (!RTASurvey.getInstance().isTrackingServiceLocked()) {
-                    String formId = message.replaceFirst(context
-                            .getString(R.string.update_schedule_by_formId), "");
-                    RTASurvey.getInstance().saveFormId(formId);
-                    Intent serviceIntent = new Intent(context, ManagerService.class);
-                    serviceIntent.setAction(ManagerService.ACTION_UPDATE_SCHEDULE);
-                    context.startService(serviceIntent);
-                } else {
-                    log.error("ERROR: The tracking service has been locked.");
-                    reportRCMCommandExeFailed(context, mid);
-                }
-
             } else if (message.startsWith(context
                     .getString(R.string.download_document))) {    //download a document
                 String url = message
@@ -1040,7 +1273,7 @@ public class ProcessRCMCommandService extends IntentService {
         task.execute();
         if (!SurveyCollectorUtils.formIsInMetadataTable(context, formId, formVersion)) {
             String logMsg = String.format("Form %s, version %s isn't existed." +
-                            " Try to download form before.", formId, formVersion);
+                    " Try to download form before.", formId, formVersion);
             log.info(logMsg);
             OldFormDownloadService.requestService(context, formId, formVersion);
         }
@@ -1210,7 +1443,7 @@ public class ProcessRCMCommandService extends IntentService {
                 if (deleted > 0 && deepDelete) {   // delete its module-subscription as well
                     // try to get the all modules need to delete, by category code
                     Cursor m = getContentResolver().query(ModuleProviderAPI.Modules.CONTENT_URI,
-                            new String[] {ModuleProviderAPI.Modules.MODULE_CODE},
+                            new String[] {ModuleProviderAPI.Modules.CODE},
                             ModuleProviderAPI.Modules.CATEGORY + "=?",
                             new String[] {code}, null);
                     // clean them
@@ -1300,11 +1533,11 @@ public class ProcessRCMCommandService extends IntentService {
                     moduleDb.cleanSubscriptionOptions(context, m.getCode());
                     if (!Module.TYPE_SYSTEM.equals(m.getType())) {
                         ContentValues values = new ContentValues();
-                        values.put(ModuleProviderAPI.Option.CODE, m.getCode() + "_auto");
-                        values.put(ModuleProviderAPI.Option.MODULE_CODE, m.getCode());
-                        values.put(ModuleProviderAPI.Option.TITLE, "Dummy Option of " + m.getCode());
-                        values.put(ModuleProviderAPI.Option.STATUS, ModuleProviderAPI.STT_SUBSCRIBED);
-                        getContentResolver().insert(ModuleProviderAPI.Option.CONTENT_URI, values);
+                        values.put(ModuleProviderAPI.Subscriptions.CODE, m.getCode() + "_auto");
+                        values.put(ModuleProviderAPI.Subscriptions.MODULE_CODE, m.getCode());
+                        values.put(ModuleProviderAPI.Subscriptions.TITLE, "Dummy Option of " + m.getCode());
+                        values.put(ModuleProviderAPI.Subscriptions.STATUS, ModuleProviderAPI.STT_SUBSCRIBED);
+                        getContentResolver().insert(ModuleProviderAPI.Subscriptions.CONTENT_URI, values);
                     }
                 }
             }
@@ -1355,11 +1588,11 @@ public class ProcessRCMCommandService extends IntentService {
                             db.cleanSubscriptionOptions(context, code);
                             if (!Module.TYPE_SYSTEM.equals(m.getType())) {
                                 ContentValues values = new ContentValues();
-                                values.put(ModuleProviderAPI.Option.CODE, m.getCode() + "_auto");
-                                values.put(ModuleProviderAPI.Option.MODULE_CODE, m.getCode());
-                                values.put(ModuleProviderAPI.Option.TITLE, "Dummy Option of " + m.getCode());
-                                values.put(ModuleProviderAPI.Option.STATUS, ModuleProviderAPI.STT_SUBSCRIBED);
-                                context.getContentResolver().insert(ModuleProviderAPI.Option.CONTENT_URI, values);
+                                values.put(ModuleProviderAPI.Subscriptions.CODE, m.getCode() + "_auto");
+                                values.put(ModuleProviderAPI.Subscriptions.MODULE_CODE, m.getCode());
+                                values.put(ModuleProviderAPI.Subscriptions.TITLE, "Dummy Option of " + m.getCode());
+                                values.put(ModuleProviderAPI.Subscriptions.STATUS, ModuleProviderAPI.STT_SUBSCRIBED);
+                                context.getContentResolver().insert(ModuleProviderAPI.Subscriptions.CONTENT_URI, values);
                             }
                         }
                     }
@@ -1553,8 +1786,12 @@ public class ProcessRCMCommandService extends IntentService {
     private void stopManagerService(Context context) {
         Intent intent = new Intent(context, ManagerService.class);
         context.stopService(intent);
-        if (LinphoneService.isReady())
+        if (LinphoneService.isReady()) {
             context.stopService(new Intent(Intent.ACTION_MAIN).setClass(context, LinphoneService.class));
+            //ActivityManager am = (ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
+            //am.killBackgroundProcesses(context.getString(R.string.sync_account_type));
+            //android.os.Process.killProcess(android.os.Process.myPid());
+        }
     }
 
     private void lockReport(Context context, String reportType, String mid,
@@ -2095,15 +2332,6 @@ public class ProcessRCMCommandService extends IntentService {
         task.execute(url);
     }
 
-    private static void makeNotificationSound(Context context, int soundId) {
-        if (soundId < MIN_NTF_SOUND_TYPE || soundId > MAX_NTF_SOUND_TYPE) {
-            soundId = MIN_NTF_SOUND_TYPE;
-        }
-        Uri notification = Uri.parse("android.resource://" + BuildConfig.APPLICATION_ID + "/raw/sound" + soundId);
-        MediaPlayer player = MediaPlayer.create(context, notification);
-        player.start();
-    }
-
     /**
      * Deletes the selected files.First from the database then from the file
      * system
@@ -2369,14 +2597,6 @@ public class ProcessRCMCommandService extends IntentService {
         }
     }
 
-    public static void broadcastUIUpdate(Context context, Intent intent) {
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
-    }
-
-    public static void broadcastUIUpdate(Context context, String action) {
-        broadcastUIUpdate(context, new Intent(action));
-    }
-
     private void receiveSSInteraction(Context context, String mid, String message)
             throws JSONException {
         boolean isTsk = message.startsWith(context.getString(R.string.task));
@@ -2447,87 +2667,6 @@ public class ProcessRCMCommandService extends IntentService {
 
                 }
             }.execute(String.valueOf(ssi_id), String.valueOf(snoozeTime), mid);
-        }
-    }
-
-    private static void reportRCMCommand(Context context, String id, String status) {
-        RCMStatusReportService.requestService(context, id, status);
-    }
-
-    public static void validateFormFamilyFromAsyncTask(Context context, String formID, String version) {
-        new ConnectionTask(context) {
-            @Override
-            protected List<FormInFamily> doInBackground(String... params) {
-                String formID = params[0], version = params[1];
-                return ConnectionService.getInstance().getFormFamily(context,
-                        RTASurvey.getInstance().getServerUrl(),
-                        RTASurvey.getInstance().getServerKey(),
-                        formID, version);
-            }
-
-            @Override
-            protected void onPostExecute(Object result) {
-                super.onPostExecute(result);
-                if (result != null && result instanceof List) {
-                    List<FormInFamily> family = (List<FormInFamily>) result;
-                    for (FormInFamily f : family) {
-                        try {
-                            if (f.isAvailable == 1) {
-                                SurveyCollectorUtils.lockForm(context, f.formID, f.version, false);
-                                SurveyCollectorUtils.handleOldForms(context, f.formID, f.version);
-                            } else {
-                                SurveyCollectorUtils.lockForm(context, f.formID, f.version, true);
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
-        }.execute(formID, version);
-    }
-
-    /**
-     * @return true if formID-version is locked
-     */
-    private static boolean validateFormFamily(Context context, String formID, String version) {
-        List<FormInFamily> family = ConnectionService.getInstance().getFormFamily(context,
-                RTASurvey.getInstance().getServerUrl(),
-                RTASurvey.getInstance().getServerKey(),
-                formID, version);
-        boolean lockItself = false;
-        if (family != null) {
-            for (FormInFamily f : family) {
-                try {
-                    if (f.isAvailable == 1) {
-                        SurveyCollectorUtils.lockForm(context, f.formID, f.version, false);
-                    } else {
-                        lockItself = lockItself || (formID.equals(f.formID) && version.equals(f.version));
-                        SurveyCollectorUtils.lockForm(context, f.formID, f.version, true);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return lockItself;
-    }
-
-    public static void reportReceivedMessage(Context context, final String mid) {
-        if (!TextUtils.isEmpty(mid)) {
-            reportRCMCommand(context, mid, Params.RCM_STATUS_RECEIVED);
-        }
-    }
-
-    public static void reportRCMCommandExeFailed(Context context, final String mid) {
-        if (!TextUtils.isEmpty(mid)) {
-            reportRCMCommand(context, mid, Params.RCM_STATUS_FAILED);
-        }
-    }
-
-    public static void reportRCMCommandExeSuccess(Context context, final String mid) {
-        if (!TextUtils.isEmpty(mid)) {
-            reportRCMCommand(context, mid, Params.RCM_STATUS_SUCCESS);
         }
     }
 
@@ -2750,170 +2889,6 @@ public class ProcessRCMCommandService extends IntentService {
             }
         });
         task.download(ruleId, type);
-    }
-
-    /**
-     * Issues a notification for App settings
-     */
-    private static void notifyNewAppSettings(Context context) {
-        // Waking up mobile if it is sleeping
-        WakeLocker.acquire(context);
-
-        NotificationCompat.Style style = new NotificationCompat.BigTextStyle()
-                .setBigContentTitle(context.getString(R.string.rta_app_name))
-                .bigText(context.getString(R.string.app_settings_update_message_full))
-                .setSummaryText(context.getString(R.string.app_settings_update_message));
-
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context)
-                .setSmallIcon(R.drawable.ic_stat_default)
-                .setContentTitle(context.getString(R.string.rta_app_name))
-                .setContentText(context.getString(R.string.app_settings_update_message))
-                .setStyle(style)
-                .setAutoCancel(true);
-
-        Intent appIntent = new Intent(context, SplashScreenActivity.class);
-        mBuilder.setContentIntent(MessageUtils.getPendingIntentWithParentStack(context, appIntent, 0));
-        NotificationManager mNotificationManager = (NotificationManager) context
-                .getSystemService(Context.NOTIFICATION_SERVICE);
-        Notification n = mBuilder.build();
-        mNotificationManager.notify(R.string.app_settings_update_message, n);
-
-        // Releasing wake lock
-        WakeLocker.release();
-    }
-
-    /**
-     * Issues a notification with alarm for Notification
-     */
-    private static void notifyNewNotification(Context context, long intervalMillis) {
-        // Waking up mobile if it is sleeping
-        WakeLocker.acquire(context);
-
-        NotificationCompat.Style style = null;
-        List<SSInteraction> list = DBService.getInstance().getNotifications(false);
-        if (list == null || list.size() == 0) {
-            return;
-        }
-
-        String senderText = context.getString(R.string.cpms_ntf_from_sender,
-                list.get(0).sender);
-
-        if (list.size() == 1) {
-            style = new NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(senderText)
-                    .setSummaryText(context.getString(R.string.menu_item_ntf))
-                    .bigText(Jsoup.parse(list.get(0).message).text());
-        } else {
-            int maxLine = 3, iLine = 0;
-            String summaryText = list.size() > maxLine ?
-                    context.getString(R.string.cpms_ntf_number_of_news_more, list.size() - maxLine) :
-                    context.getString(R.string.menu_item_ntf);
-            style = new NotificationCompat.InboxStyle()
-                    .setBigContentTitle(context.getString(R.string.cpms_ntf_number_of_news, list.size()))
-                    .setSummaryText(summaryText);
-            while (iLine < list.size() && iLine < maxLine) {
-                SSInteraction i = list.get(iLine);
-                String line = String.format("%s -> %s", i.sender,
-                        Jsoup.parse(i.message).text());
-                ((NotificationCompat.InboxStyle) style).addLine(line);
-                iLine++;
-            }
-        }
-
-        String smallContentText = list.size() == 1 ? senderText
-                : context.getString(R.string.cpms_ntf_number_of_news, list.size());
-
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
-                context.getApplicationContext())
-                .setSmallIcon(R.drawable.cpms_main_ntf)
-                .setContentTitle(context.getString(R.string.menu_item_ntf))
-                .setContentText(smallContentText)
-                .setStyle(style);
-
-        Intent appIntent = new Intent(context, NotificationListActivity.class);
-        mBuilder.setContentIntent(MessageUtils.getPendingIntentWithParentStack(context, appIntent, 0));
-        NotificationManager mNotificationManager = (NotificationManager) context
-                .getSystemService(Context.NOTIFICATION_SERVICE);
-
-        Notification n = mBuilder.build();
-        if (intervalMillis > 0) {
-            MessageUtils.snoozeTime = intervalMillis;
-            mNotificationManager.cancel(MessageUtils.NTF_ID_FOR_NTFICATION);
-            mNotificationManager.notify(MessageUtils.SOUND_NTF_ID_FOR_NTFICATION, n);
-        } else {
-            mNotificationManager.cancel(MessageUtils.SOUND_NTF_ID_FOR_NTFICATION);
-            mNotificationManager.notify(MessageUtils.NTF_ID_FOR_NTFICATION, n);
-        }
-
-        // Releasing wake lock
-        WakeLocker.release();
-    }
-
-    /**
-     * Issues a notification with alarm for TaskReminder
-     */
-    private static void notifyNewTask(Context context, long intervalMillis) {
-        // Waking up mobile if it is sleeping
-        WakeLocker.acquire(context);
-
-        NotificationCompat.Style style = null;
-        List<SSInteraction> list = DBService.getInstance().getTaskReminders(false);
-        if (list == null || list.size() == 0) {
-            return;
-        }
-
-        String senderText = context.getString(R.string.cpms_tsk_from_sender,
-                list.get(0).sender);
-
-        if (list.size() == 1) {
-            style = new NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(senderText)
-                    .setSummaryText(context.getString(R.string.menu_item_task))
-                    .bigText(Jsoup.parse(list.get(0).message).text());
-        } else {
-            int maxLine = 3, iLine = 0;
-            String summaryText = list.size() > maxLine ?
-                    context.getString(R.string.cpms_tsk_number_of_news_more, list.size() - maxLine) :
-                    context.getString(R.string.menu_item_task);
-            style = new NotificationCompat.InboxStyle()
-                    .setBigContentTitle(context.getString(R.string.cpms_tsk_number_of_news, list.size()))
-                    .setSummaryText(summaryText);
-            while (iLine < list.size() && iLine < maxLine) {
-                SSInteraction i = list.get(iLine);
-                String line = String.format("%s -> %s", i.sender,
-                        Jsoup.parse(i.message).text());
-                ((NotificationCompat.InboxStyle) style).addLine(line);
-                iLine++;
-            }
-        }
-
-        String smallContentText = list.size() == 1 ? senderText
-                : context.getString(R.string.cpms_tsk_number_of_news, list.size());
-
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
-                context.getApplicationContext())
-                .setSmallIcon(R.drawable.cpms_main_task)
-                .setContentTitle(context.getString(R.string.menu_item_task))
-                .setContentText(smallContentText)
-                .setStyle(style);
-
-        Intent appIntent = new Intent(context, NotificationListActivity.class);
-        mBuilder.setContentIntent(MessageUtils.getPendingIntentWithParentStack(context, appIntent, 0));
-        NotificationManager mNotificationManager = (NotificationManager) context
-                .getSystemService(Context.NOTIFICATION_SERVICE);
-
-        Notification n = mBuilder.build();
-        if (intervalMillis > 0) {
-            MessageUtils.snoozeTime = intervalMillis;
-            mNotificationManager.cancel(MessageUtils.NTF_ID_FOR_TASKREMINDER);
-            mNotificationManager.notify(MessageUtils.SOUND_NTF_ID_FOR_TASKREMINDER, n);
-        } else {
-            mNotificationManager.cancel(MessageUtils.SOUND_NTF_ID_FOR_TASKREMINDER);
-            mNotificationManager.notify(MessageUtils.NTF_ID_FOR_TASKREMINDER, n);
-        }
-
-        // Releasing wake lock
-        WakeLocker.release();
     }
 
     class ForwardInstanceInfo implements Serializable {

@@ -24,6 +24,7 @@ import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.AsyncQueryHandler;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.ContentUris;
@@ -40,6 +41,8 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -49,6 +52,8 @@ import android.os.Handler;
 import android.preference.ListPreference;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Images;
+import android.provider.OpenableColumns;
+import android.support.design.widget.BottomSheetBehavior;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.widget.Toolbar;
@@ -76,6 +81,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
@@ -87,6 +93,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -94,9 +101,12 @@ import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.RelativeLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.rta.ipcall.LinphoneService;
+import com.rta.ipcall.ui.OnUpdateUIListener;
 import com.zj.btsdk.BluetoothService;
 
 import net.sqlcipher.database.SQLiteDatabase;
@@ -144,9 +154,9 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -156,8 +166,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import timber.log.Timber;
 import vn.rta.cpms.activities.FormSelectionActivity;
+import vn.rta.cpms.activities.RtDimmableActivity;
 import vn.rta.cpms.keyboard.RTAInputManager;
 import vn.rta.cpms.listener.PermissionRequestListener;
 import vn.rta.cpms.preference.AppSettingSharedPreferences;
@@ -167,6 +185,7 @@ import vn.rta.cpms.services.FailedReportManager;
 import vn.rta.cpms.services.ProcessDbHelper;
 import vn.rta.cpms.services.UserListDbHelper;
 import vn.rta.cpms.services.model.Response;
+import vn.rta.cpms.services.model.UserInfo;
 import vn.rta.cpms.tasks.ConnectionTask;
 import vn.rta.cpms.ui.ntfaction.FloatingNtfActionService;
 import vn.rta.cpms.ui.ntfaction.NtfActionListOverlayService;
@@ -181,7 +200,6 @@ import vn.rta.media.android.callrecord.CallBroadcastReceiver;
 import vn.rta.media.android.callrecord.RecordService;
 import vn.rta.piwik.PiwikTrackerManager;
 import vn.rta.survey.android.R;
-import vn.rta.survey.android.activities.CommonActivity;
 import vn.rta.survey.android.activities.DeviceListActivity;
 import vn.rta.survey.android.application.Constants;
 import vn.rta.survey.android.application.IPremiumLicense;
@@ -244,6 +262,8 @@ import vn.rta.survey.android.views.googleprogessbar.ProgressBarHandler;
 import vn.rta.survey.android.views.roundcornerprogress.TextRoundCornerProgressBar;
 import vn.rta.survey.android.widgets.CallRecordWidgets;
 import vn.rta.survey.android.widgets.QACheckPointWidget;
+import vn.rta.survey.android.widgets.alternatives.AlbumControlView;
+import vn.rta.survey.android.widgets.alternatives.WidgetAlternative;
 import vn.rta.survey.android.widgets.handledata.SelectMultiWidgetDataHandler;
 import vn.rta.survey.android.widgets.timeinstance.CountDownTimerInstance;
 
@@ -256,40 +276,22 @@ import vn.rta.survey.android.widgets.timeinstance.CountDownTimerInstance;
  *         constraint behavior option)
  * @author Thi Nguyen
  */
-public class FormEntryActivity extends CommonActivity implements
+public class FormEntryActivity extends RtDimmableActivity implements
         AnimationListener, FormLoaderListener, FormSavedListener,
         AdvanceToNextListener, OnGestureListener, SavePointListener,
         UpdateStatusMenuQA, EndSurveyListener, OnCreateRepeatRecord, ChooseFormLanguageListener,
         SaveCurrentAnswerListener, OnRefreshScreenListener,
         OnSpecialTouchListener, RemoveResponeListener, OnFocusListener, RTAView.ScrollChangeListener, UploadWorkingTask.InstanceUploadListener,
-        OnNotifyComboWidget, LinphoneAccountCreator.LinphoneAccountCreatorListener, BluetoothServiceCallback {
-    private static final String t = "FormEntryActivity";
-
-    // save with every swipe forward or back. Timings indicate this takes .25
-    // seconds.
-    // if it ever becomes an issue, this value can be changed to save every n'th
-    // screen.
-    private static final int SAVEPOINT_INTERVAL = 1;
-
-    // Defines for FormEntryActivity+
-    private static final boolean EXIT = true;
-    private static final boolean DO_NOT_EXIT = false;
+        OnNotifyComboWidget, LinphoneAccountCreator.LinphoneAccountCreatorListener, BluetoothServiceCallback, MediaPlayer.OnPreparedListener, MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener {
     public static final boolean EVALUATE_CONSTRAINTS = true;
     public static final boolean DO_NOT_EVALUATE_CONSTRAINTS = false;
     public static final String EXTRA_FROM_NEW_INTENT = "FROM_NEW_INTENT";
     public static final String PREFIX_SHOW_DIALOG = "dialog(";
-
-    // add by rta
-    private static final String STARTFORM = "Beginform";
-    private static final String ENDFORMS = "SaveAndExit_S";
-    private static final String ENDFORMF = "SaveAndExit_F";
-
     public static final String IS_NEXT_INSTANCE = "is_next_instance";
     public static final String IS_SENT_INSTANCE = "is_sent_instance";
     public static final String INSTANCE_ID = "instance_id";
     public static final String FORM_ID = "form_id";
     public static final String FORM_VERSION = "form_version";
-
     // Request codes for returning data from specified intent.
     public static final int IMAGE_CAPTURE = 1;
     public static final int BARCODE_CAPTURE = 2;
@@ -324,33 +326,28 @@ public class FormEntryActivity extends CommonActivity implements
     public static final int GEOSHAPE_CAPTURE = 33;
     public static final int GEOTRACE_CAPTURE = 34;
     public static final int INLINEVIDEO_ALBUMM_CAPTURE = 35;
-    public static final int VERIFY_FACEBOOK=36;
+    public static final int VERIFY_FACEBOOK = 36;
+    public static final int ALBUM_CAPTURE = 37;
+    public static final int ALBUM_UPDATE = 38;
+    public static final int VIDEO_PLAYER = 39;
     public static final String GEOSHAPE_RESULTS = "GEOSHAPE_RESULTS";
     public static final String GEOTRACE_RESULTS = "GEOTRACE_RESULTS";
-
     // Extra returned from gp activity
     public static final String LOCATION_RESULT = "LOCATION_RESULT";
     public static final String BEARING_RESULT = "BEARING_RESULT";
-
     //The name of file which contain latest instance path which wasn't safely saved.
     public static final String CONFIG_FILE_NAME = "config";
-
     public static final String KEY_INSTANCES = "instances";
     public static final String KEY_SUCCESS = "success";
     public static final String KEY_ERROR = "error";
-
     public static final String ACTION_FLOATING_BARCODE = FormEntryActivity.class.getName() + ".ACTION_FLOATING_BARCODE";
+    public static final String ACTION_FLOATING_BARCODE_ACTION = FormEntryActivity.class.getName() + ".ACTION_FLOATING_BARCODE_ACTION";
     public static final String ACTION_FLOATING_AUDIO = FormEntryActivity.class.getName() + ".ACTION_FLOATING_AUDIO";
     public static final String ACTION_RELOAD_LAYOUT = FormEntryActivity.class.getName() + ".ACTION_RELOAD_LAYOUT";
     public static final String ACTION_FLOATING_SIP_CALL = FormEntryActivity.class.getName() + ".ACTION_FLOATING_SIP_CALL";
-
+    public static final String ACTION_AUDIO_CAPTURE = FormEntryActivity.class.getName() + ".ACTION_AUDIO_CAPTURE";
     // Identifies the gp of the form used to launch form entry
     public static final String KEY_FORMPATH = "formpath";
-
-    // Identifies whether this is a new form, or reloading a form after a screen
-    // rotation (or similar)
-    private static final String NEWFORM = "newform";
-
     // these are only processed if we shut down and are restoring after an
     // external intent fires
     public static final String KEY_INSTANCEPATH = "instancepath";
@@ -358,31 +355,28 @@ public class FormEntryActivity extends CommonActivity implements
     public static final String KEY_EXTERNALDATAPATH = "externalDataPath";
     public static final String KEY_XPATH = "xpath";
     public static final String KEY_XPATH_WAITING_FOR_DATA = "xpathwaiting";
-
-    private static final int REQUEST_ENABLE_BT = 28;
-    private BluetoothService bluetoothService = null;
-    private static final int REQUEST_CONNECT_DEVICE = 29;
-
-    int screenWidth = 0;
-    int screenHeight = 0;
-
-    public boolean isImmersiveFullscreen = false;
-
-    private boolean isNextInstance = false;
-    private boolean isSentInstance = false;
-    private boolean isShowPercentProgress = false;
-    //qa checking
-    private boolean havePopupWidget = false;
-
-
-    // check relevant in question
-    public static boolean fisrtShow = true;
-    //check show promt list
-    public static boolean isShowFromtList = false;
-
     // Tracks whether we are autosaving
     public static final String KEY_AUTO_SAVED = "autosaved";
-
+    public static final String KEY_FONT_SIZE = "font_size";
+    public static final int PERMISSIONS_REQUEST = 1;
+    private static final String t = "FormEntryActivity";
+    // save with every swipe forward or back. Timings indicate this takes .25
+    // seconds.
+    // if it ever becomes an issue, this value can be changed to save every n'th
+    // screen.
+    private static final int SAVEPOINT_INTERVAL = 1;
+    // Defines for FormEntryActivity+
+    private static final boolean EXIT = true;
+    private static final boolean DO_NOT_EXIT = false;
+    // add by rta
+    private static final String STARTFORM = "Beginform";
+    private static final String ENDFORMS = "SaveAndExit_S";
+    private static final String ENDFORMF = "SaveAndExit_F";
+    // Identifies whether this is a new form, or reloading a form after a screen
+    // rotation (or similar)
+    private static final String NEWFORM = "newform";
+    private static final int REQUEST_ENABLE_BT = 28;
+    private static final int REQUEST_CONNECT_DEVICE = 29;
     private static final int MENU_LANGUAGES = Menu.FIRST;
     private static final int MENU_HIERARCHY_VIEW = Menu.FIRST + 1;
     private static final int MENU_SAVE = Menu.FIRST + 2;
@@ -392,60 +386,97 @@ public class FormEntryActivity extends CommonActivity implements
     private static final int MENU_IMAGE_REPORT = Menu.FIRST + 6;
     private static final int MENU_REQUEST_EDIT = Menu.FIRST + 7;
     private static final int MENU_FONT_SIZE = Menu.FIRST + 8;
-
     private static final int PROGRESS_DIALOG = 1;
     private static final int SAVING_DIALOG = 2;
     private static final int CONSTRAIN_DIALOG = 3;
-
-    private boolean mAutoSaved;
-    private boolean existEndSurvey = false;
     // Random ID
     private static final int DELETE_REPEAT = 654321;
-
+    private static final int OPEN_IN_MUSIC = 1;
+    private static final int COUNTER_UPDATE_MSG_ID = 123;
+    // check relevant in question
+    public static boolean fisrtShow = true;
+    //check show promt list
+    public static boolean isShowFromtList = false;
+    public static boolean currentIsRepeat = false;
+    public static String currentRepeatName = "";
+    public static HashMap<String, TimeTampEntity> tempTimeMaps = new HashMap<>();
+    public static boolean isFloating;
+    //flag is sending working data
+    private static boolean isSendingWorking = false;
+    //flag is data has changed in xml
+    private static boolean isSaveConfig = false;
+    private static ArrayList<Integer> mPointCountsList;
+    private static String keyQuestion;
+    private final Object saveDialogLock = new Object();
+    public boolean isImmersiveFullscreen = false;
+    public boolean ispause = false;
+    public boolean isViewOnly = false;
+    public ArrayList<FailedConstraint> listConfirmRead;
+    public boolean isLoading = false;
+    protected boolean isOnActivityResult = false;
+    boolean isresume = false;
+    int screenWidth = 0;
+    int screenHeight = 0;
+    //For receive phone call event
+    CallBroadcastReceiver callReceiver;
+    IntentFilter callIntentFilter;
+    Toolbar mToolbar;
+    int countTimer;
+    int positionConfirmRead = 0;
+    ExecutorService mThreadPool;
+    boolean started = true;
+    int duration = 0;
+    /**
+     * Creates a view given the View type and an event
+     *
+     * @param event
+     * @param advancingPage -- true if this results from advancing through the form
+     * @return newly created View
+     */
+    boolean movingNext = true;   //true: moving next. false: moving back
+    int progressWaitChecking;
+    OnUpdateUIListener updateUIListener = null;
+    private int countAction = 0;
+    private String action_qrapi = "";
+    private Map<String, HashMap<String, List<String>>> question;
+    private BluetoothService bluetoothService = null;
+    private boolean isNextInstance = false;
+    private boolean isSentInstance = false;
+    private boolean isShowPercentProgress = false;
+    //qa checking
+    private boolean havePopupWidget = false;
+    private boolean mAutoSaved;
+    private boolean existEndSurvey = false;
     private String mFormPath;
     private GestureDetector mGestureDetector;
-
     private Animation mInAnimation;
     private Animation mOutAnimation;
     private View mStaleView = null;
-
     private LinearLayout mQuestionHolder;
     private View mCurrentView;
-
+    private File infLegacy = null;
     private AlertDialog mAlertDialog;
     private Dialog error_dialog, warnig_dialog, exit_dialog, add_new_group, add_one_more_group;
     private Dialog loading_dialog, saving_dialog, changes_language;
     private ProgressDialog mProgressDialog;
     private String mErrorMessage;
-
     private String instacePathforDatabase;
     private String timeStart = "";
     private String total = "";
     private long timeStartmilis = 0;
     private long IdInstanceSend = -1;
-
     // used to limit forward/backward swipes to one per question
     private boolean mBeenSwiped = false;
-    private final Object saveDialogLock = new Object();
-
     private String nameofInstance;
     private int viewCount = 0;
-
     //number error of QA checking reciver form server
     private long numberError = 0;
-
     private FormController mFormController;
     private FormLoaderTask mFormLoaderTask;
     private ReFormLoaderTask mReFormLoaderTask;
     private SaveToDiskTask mSaveToDiskTask;
     private ExportToCsvTask mExportToCsvTask;
     private UploadWorkingTask mUploadWorkingTask;
-
-    //For receive phone call event
-    CallBroadcastReceiver callReceiver;
-    IntentFilter callIntentFilter;
-
-    Toolbar mToolbar;
     private ImageButton mNextButton;
     private ImageButton mBackButton;
     private ImageButton mNext;
@@ -453,46 +484,272 @@ public class FormEntryActivity extends CommonActivity implements
     private ImageButton mUp;
     private ImageButton mDown;
     private boolean isScrollable;
-
     private Button mShowPercentProgress;
-
     private RelativeLayout out;
-
-    public static boolean currentIsRepeat = false;
-    public static String currentRepeatName = "";
-
+    private RelativeLayout content;
+    //mdeia player
+    private PreviewPlayer mPlayer;
+    private TextView mTextLine1;
+    private TextView mTextTimer;
+    private ImageButton closePlayer;
+    private TextView mTextLine2;
+    private TextView mLoadingText;
+    private TextView mTextSize;
+    private SeekBar mSeekBar;
+    private Handler mProgressRefresher;
+    private boolean mSeeking = false;
+    private int mDuration;
+    private Uri mUri;
+    private long mMediaId = -1;
+    private AudioManager mAudioManager;
+    private boolean mPausedByTransientLossOfFocus;
+    private int countSave = 0;
     private String stepMessage = "";
-    public boolean isViewOnly = false;
     private boolean isComfrimAudioRecore = false;
-    protected boolean isOnActivityResult = false;
-
-    //flag is sending working data
-    private static boolean isSendingWorking = false;
-
-    //flag is data has changed in xml
-    private static boolean isSaveConfig = false;
-
-    private static ArrayList<Integer> mPointCountsList;
-    public static HashMap<String, TimeTampEntity> tempTimeMaps = new HashMap<>();
-    private static String keyQuestion;
-
+    private Handler mHandler;
     private Bundle preloadBundle = null;
-    boolean started = true;
     private FormIndex currentQaCheckPoint = null;
     private boolean waitingCheckpoint;
     private String currentCommand;
-
     private Dialog qaCheckPointDialog;
-
     private CountDownTimer waitingQAResultCountDown;
     private Dialog waitingQAResultDialog;
     private boolean isReatpeatDelete = false;
     private String formFamilyNext;
     private AlertDialog constraintMessageDialog;
-    private List<FormIndex> mListInvisibleIndex = new ArrayList<>();
-
     private ListPreference mFontSizePreference;
-    public static final String KEY_FONT_SIZE = "font_size";
+    //skip validate form
+    private boolean skipValidate = false;
+    private AudioManager.OnAudioFocusChangeListener mAudioFocusListener = new AudioManager.OnAudioFocusChangeListener() {
+        public void onAudioFocusChange(int focusChange) {
+            if (mPlayer == null) {
+                // this activity has handed its MediaPlayer off to the next activity
+                // (e.g. portrait/landscape switch) and should abandon its focus
+                mAudioManager.abandonAudioFocus(this);
+                return;
+            }
+            switch (focusChange) {
+                case AudioManager.AUDIOFOCUS_LOSS:
+                    mPausedByTransientLossOfFocus = false;
+                    mPlayer.pause();
+                    break;
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                    if (mPlayer.isPlaying()) {
+                        mPausedByTransientLossOfFocus = true;
+                        mPlayer.pause();
+                    }
+                    break;
+                case AudioManager.AUDIOFOCUS_GAIN:
+                    if (mPausedByTransientLossOfFocus) {
+                        mPausedByTransientLossOfFocus = false;
+                        start();
+                    }
+                    break;
+            }
+            updatePlayPause();
+        }
+    };
+    private SeekBar.OnSeekBarChangeListener mSeekListener = new SeekBar.OnSeekBarChangeListener() {
+        public void onStartTrackingTouch(SeekBar bar) {
+            mSeeking = true;
+        }
+
+        public void onProgressChanged(SeekBar bar, int progress, boolean fromuser) {
+            if (!fromuser) {
+                return;
+            }
+            // Protection for case of simultaneously tapping on seek bar and exit
+            if (mPlayer == null) {
+                return;
+            }
+            mPlayer.seekTo(progress);
+        }
+
+        public void onStopTrackingTouch(SeekBar bar) {
+            mSeeking = false;
+        }
+    };
+    private FormIndex formIndexClear = null;
+    private InstancePoolManager instancePoolManager = InstancePoolManager.getManager();
+    private AggregateLocal aggregateLocal;
+    private boolean safeExitForm = false;
+    private int mAnimationCompletionSet = 0;
+    private ProgressDialog dialogProcessQAchecking;
+    private boolean isBreakThreadQA = false;
+    private BottomSheetBehavior mBottomSheetBehavior;
+    private PermissionRequestListener listener;
+    private TextRoundCornerProgressBar progressFillForm;
+    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ACTION_FLOATING_BARCODE.equals(action)) {
+                boolean isCombo = intent.getBooleanExtra(RTAView.NOTIFY_COMBO, false);
+                if (mFormController != null) {
+                    String sb = intent.getStringExtra("SCAN_RESULT");
+                    String viewIndex = intent.getStringExtra("VIEW_INDEX");
+                    if (sb == null || sb.equals("")) {
+                        return;
+                    }
+                    if (viewIndex == null || viewIndex.equals("")) {
+                        viewIndex = getIntent().getStringExtra(RTAView.BINARY_QUESTION_INDEX);
+                    }
+                    if (viewIndex == null || viewIndex.equals("")) {
+                        return;
+                    }
+                    if (isCombo) {
+                        String reference = intent.getStringExtra(RTAView.REFER_QUESTION_COMBO);
+                        ((RTAView) mCurrentView).setComboData(sb, reference);
+                    }
+                    if (mCurrentView instanceof RTAView)
+                        ((RTAView) mCurrentView).setBinaryData(sb, viewIndex);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                    refreshCurrentView(viewIndex);
+                    mFormController.setIndexWaitingForData(null);
+                }
+            } else if (ACTION_FLOATING_BARCODE_ACTION.equals(action)) {
+                action_qrapi = intent.getStringExtra("SCAN_ACTION");
+                notifyActionAnswer(question);
+
+            } else if (ACTION_RELOAD_LAYOUT.equals(action)) {
+                if (isFloating) {
+                    if (ScreenUtils.isDimmed()) {
+                        refreshCurrentView();
+                    }
+                }
+            } else if (ACTION_FLOATING_AUDIO.equals(action)) {
+                String audioData = intent.getStringExtra(BackGroundAudioRecordService.EXTRA_AUDIO_PATH);
+                if (audioData == null) {
+                    return;
+                }
+                String viewIndex = intent.getStringExtra("VIEW_INDEX");
+                if (viewIndex == null || viewIndex.equals("")) {
+                    viewIndex = getIntent().getStringExtra(RTAView.BINARY_QUESTION_INDEX);
+                }
+
+                if (viewIndex == null || viewIndex.equals("")) {
+                    return;
+                }
+
+                if (mCurrentView instanceof RTAView)
+                    ((RTAView) mCurrentView).setBinaryDataWithoutCheck(new StringData(audioData), viewIndex);
+
+                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                stopService(new Intent(FormEntryActivity.this, BackGroundAudioRecordService.class));
+            } else if (ACTION_FLOATING_SIP_CALL.equals(action)) {
+                FormController formController = RTASurvey.getInstance().getFormController();
+                if (formController != null) {
+                    String sb = intent.getStringExtra("SCAN_RESULT");
+                    FormIndex viewIndex = formController.getSipCallIndexs();
+                    if (sb == null || sb.equals("")) {
+                        return;
+                    }
+                    if (viewIndex == null || viewIndex.equals("")) {
+                        return;
+                    }
+                    try {
+                        String oldAnser = formController.getQuestionPrompt(viewIndex).getAnswerText();
+                        if (oldAnser != null)
+                            sb = oldAnser + " " + sb;
+                        formController.saveAnswer(viewIndex, new StringData(sb));
+                    } catch (JavaRosaException e) {
+                        e.printStackTrace();
+                    }
+                    refreshCurrentView();
+                }
+            } else if (ACTION_AUDIO_CAPTURE.equals(action)) {
+                String index = null;
+                try {
+                    index = intent.getStringExtra(RTAView.BINARY_QUESTION_INDEX);
+                    if (index == null)
+                        index = getIntent().getStringExtra(RTAView.BINARY_QUESTION_INDEX);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                // For audio/video capture/chooser, we get the URI from the content
+                // provider
+                // then the widget copies the file and makes a new entry in the
+                // content provider.
+                Uri capturedVideo = intent.getParcelableExtra("DATA");
+                if (capturedVideo != null) {
+                    String pathSrcVideo = capturedVideo.getPath();
+                    File srcVideoFile = new File(pathSrcVideo);
+                    String instanceFolderVideo = mFormController.getInstancePath()
+                            .getParent();
+                    String pathDestVideo = instanceFolderVideo + File.separator
+                            + System.currentTimeMillis();
+
+                    File destVideoFile = new File(pathDestVideo);
+                    if (!destVideoFile.exists()) {
+                        Log.e(t, destVideoFile.getAbsolutePath() + " this is not exists");
+                    }
+
+                    try {
+                        org.apache.commons.io.FileUtils.moveFile(srcVideoFile, destVideoFile);
+                    } catch (IOException e) {
+                        Log.e(t, "Failed to move file to " + destVideoFile.getAbsolutePath());
+                        e.printStackTrace();
+                    }
+                    ((RTAView) mCurrentView).setBinaryData(destVideoFile, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                } else {
+                    ((RTAView) mCurrentView).setBinaryData(null, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                }
+
+            }
+        }
+    };
+
+    public static boolean isSendingWorking() {
+        return isSendingWorking;
+    }
+
+    public static void setIsSendingWorking(boolean isSendingWorking) {
+        FormEntryActivity.isSendingWorking = isSendingWorking;
+    }
+
+    @Deprecated
+    public static void setIsChangeDataEdit(boolean isChangeDataEdit) {
+    }
+
+    public static void openFormEntry(Context context, long formId,
+                                     Bundle preloadBundle, String keyQuestion) {
+        Uri formUri = ContentUris.withAppendedId(FormsColumns.CONTENT_URI, formId);
+        Intent fillForm = new Intent(Intent.ACTION_EDIT, formUri);
+        if (preloadBundle != null) {
+            fillForm.putExtras(preloadBundle);
+        }
+        FormEntryActivity.keyQuestion = keyQuestion;
+        context.startActivity(fillForm);
+    }
+
+    public static void openFormEntry(Context context, String jrFormId, String jrVersion,
+                                     Bundle preloadBundle, String keyQuestion) {
+        Cursor c = context.getContentResolver().query(FormsColumns.CONTENT_URI,
+                new String[]{FormsColumns._ID},
+                FormsColumns.JR_FORM_ID + "=? and " +
+                        FormsColumns.JR_VERSION + "=? and " +
+                        FormsColumns.AVAILABILITY_STATUS + "=?",
+                new String[]{jrFormId, jrVersion, FormsProviderAPI.STATUS_AVAILABLE}, null);
+        long id = -1;
+        if (c != null) {
+            if (c.moveToFirst()) {
+                id = c.getLong(0);
+            }
+            c.close();
+        }
+        if (id > -1) {
+            openFormEntry(context, id, preloadBundle, keyQuestion);
+        } else {
+            Log.e(t, "ERROR:: Cannot connect to Form's data provider");
+        }
+    }
+
+    public void setCountSave(int countSave) {
+        this.countSave = countSave;
+    }
 
     @Override
     public void onSpecialTouch(int left, int top, int height, int width) {
@@ -618,90 +875,56 @@ public class FormEntryActivity extends CommonActivity implements
 
     }
 
-    enum AnimationType {
-        LEFT, RIGHT, FADE
+    @Override
+    public void onCompletion(MediaPlayer mp) {
+        mSeekBar.setProgress(mDuration);
+        updatePlayPause();
+
     }
 
-    private TextRoundCornerProgressBar progressFillForm;
-    public static boolean isFloating;
+    @Override
+    public boolean onError(MediaPlayer mp, int what, int extra) {
+        return false;
+    }
 
-    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (ACTION_FLOATING_BARCODE.equals(action)) {
-                boolean isCombo = intent.getBooleanExtra(RTAView.NOTIFY_COMBO, false);
-                if (mFormController != null) {
-                    String sb = intent.getStringExtra("SCAN_RESULT");
-                    String viewIndex = intent.getStringExtra("VIEW_INDEX");
-                    if (sb == null || sb.equals("")) {
-                        return;
-                    }
-                    if (viewIndex == null || viewIndex.equals("")) {
-                        viewIndex = getIntent().getStringExtra(RTAView.BINARY_QUESTION_INDEX);
-                    }
-                    if (viewIndex == null || viewIndex.equals("")) {
-                        return;
-                    }
-                    if (isCombo) {
-                        String reference = intent.getStringExtra(RTAView.REFER_QUESTION_COMBO);
-                        ((RTAView) mCurrentView).setComboData(sb, reference);
-                    }
-                    if (mCurrentView instanceof RTAView)
-                        ((RTAView) mCurrentView).setBinaryData(sb, viewIndex);
-                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-                    refreshCurrentView(viewIndex);
-                    mFormController.setIndexWaitingForData(null);
-                }
-            } else if (ACTION_RELOAD_LAYOUT.equals(action)) {
-                if (isFloating) {
-                    if (ScreenUtils.isDimmed()) {
-                        refreshCurrentView();
-                    }
-                }
-            } else if (ACTION_FLOATING_AUDIO.equals(action)) {
-                String audioData = intent.getStringExtra(BackGroundAudioRecordService.EXTRA_AUDIO_PATH);
-                if (audioData == null || audioData.equals("")) {
-                    return;
-                }
-                String viewIndex = intent.getStringExtra("VIEW_INDEX");
-                if (viewIndex == null || viewIndex.equals("")) {
-                    viewIndex = getIntent().getStringExtra(RTAView.BINARY_QUESTION_INDEX);
-                }
+    @Override
+    public void onPrepared(MediaPlayer mp) {
+        if (isFinishing()) return;
+        mPlayer = (PreviewPlayer) mp;
+        setNames();
+        mPlayer.start();
+        showPostPrepareUI();
 
-                if (viewIndex == null || viewIndex.equals("")) {
-                    return;
-                }
+    }
 
-                if (mCurrentView instanceof RTAView)
-                    ((RTAView) mCurrentView).setBinaryDataWithoutCheck(new StringData(audioData), viewIndex);
+    public void playPauseClicked(View v) {
+        // Protection for case of simultaneously tapping on play/pause and exitex
 
-                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-                stopService(new Intent(FormEntryActivity.this, BackGroundAudioRecordService.class));
-            } else if (ACTION_FLOATING_SIP_CALL.equals(action)) {
-                FormController formController = RTASurvey.getInstance().getFormController();
-                if (formController != null) {
-                    String sb = intent.getStringExtra("SCAN_RESULT");
-                    FormIndex viewIndex = formController.getSipCallIndexs();
-                    if (sb == null || sb.equals("")) {
-                        return;
-                    }
-                    if (viewIndex == null || viewIndex.equals("")) {
-                        return;
-                    }
-                    try {
-                        String oldAnser = formController.getQuestionPrompt(viewIndex).getAnswerText();
-                        if (oldAnser != null)
-                            sb = oldAnser + " " + sb;
-                        formController.saveAnswer(viewIndex, new StringData(sb));
-                    } catch (JavaRosaException e) {
-                        e.printStackTrace();
-                    }
-                    refreshCurrentView();
-                }
-            }
+        if (mPlayer == null) {
+            return;
         }
-    };
+        if (mPlayer.isPlaying()) {
+            ispause = true;
+            isresume = true;
+            mPlayer.pause();
+        } else {
+            ispause = false;
+            if (!isresume) {
+                timer();
+            }
+            isresume = false;
+            start();
+
+
+        }
+        updatePlayPause();
+    }
+
+    @Override
+    protected int getContentViewId() {
+        return (R.layout.form_entry);
+    }
+    //refreh current view when remove answer
 
     @SuppressWarnings("deprecation")
     @Override
@@ -716,6 +939,8 @@ public class FormEntryActivity extends CommonActivity implements
         SQLiteDatabase.loadLibs(this);
 
         Intent intentSetting = getIntent();
+
+        listConfirmRead = new ArrayList<>();
 
         if (intentSetting != null) {
             Uri uri = intentSetting.getData();
@@ -779,9 +1004,11 @@ public class FormEntryActivity extends CommonActivity implements
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(ACTION_FLOATING_BARCODE);
+        intentFilter.addAction(ACTION_FLOATING_BARCODE_ACTION);
         intentFilter.addAction(ACTION_FLOATING_AUDIO);
         intentFilter.addAction(ACTION_RELOAD_LAYOUT);
         intentFilter.addAction(ACTION_FLOATING_SIP_CALL);
+        intentFilter.addAction(ACTION_AUDIO_CAPTURE);
 
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, intentFilter);
         RTASurvey.getInstance().setActivity(this);
@@ -795,8 +1022,8 @@ public class FormEntryActivity extends CommonActivity implements
             return;
         }
 
-        setContentView(R.layout.form_entry);
         out = (RelativeLayout) findViewById(R.id.rl);
+        content = (RelativeLayout) findViewById(R.id.rl_content);
 
         //Use the new, powerful toolbar to replace the old actionbar
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -806,7 +1033,7 @@ public class FormEntryActivity extends CommonActivity implements
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         RTAInputManager.getInstance().setView(out);
-        RTAInputManager.getInstance().setButtonHolderView(findViewById(R.id.buttonholder).getId());
+        // RTAInputManager.getInstance().setButtonHolderView(findViewById(R.id.buttonholder).getId());
 
         setTitle(getString(R.string.loading_form));
 
@@ -1183,6 +1410,7 @@ public class FormEntryActivity extends CommonActivity implements
         screenWidth = display.getWidth();
         screenHeight = display.getHeight();
 
+        /*
         if (!PreferencesManager.getPreferencesManager(RTASurvey.getInstance())
                 .getBoolean(_PreferencesActivity.KEY_DISABLE_FULL_SCREEN, false)) {
             final View decorView = getWindow().getDecorView();
@@ -1195,6 +1423,7 @@ public class FormEntryActivity extends CommonActivity implements
                 }
             });
         }
+        */
 
         callReceiver = new CallBroadcastReceiver(this);
         callIntentFilter = new IntentFilter(CallRecordWidgets.INTENT_CALL_RECORD);
@@ -1207,6 +1436,231 @@ public class FormEntryActivity extends CommonActivity implements
         int height = displaymetrics.heightPixels;
         params.setMargins(0, height / 4, 0, 0);
         view.setLayoutParams(params);
+    }
+
+    //Audio Media Player
+    public void showMediaPlayer(Uri uri) {
+        mThreadPool = Executors.newCachedThreadPool();
+        Animation SnackbarShow = AnimationUtils.loadAnimation(this, R.anim.snackbar_show_animation);
+        final Animation SnackbarHide = AnimationUtils.loadAnimation(this, R.anim.snackbar_hide_animation);
+        final RelativeLayout layout_media = (RelativeLayout) findViewById(R.id.snacbar_player);
+        if (mNextButton.getVisibility() == View.GONE || mBackButton.getVisibility() == View.GONE) {
+            RelativeLayout.LayoutParams p = new RelativeLayout.LayoutParams(LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+
+            p.addRule(RelativeLayout.ABOVE, layout_media.getId());
+            mQuestionHolder.setLayoutParams(p);
+
+        }
+        layout_media.setVisibility(View.VISIBLE);
+        layout_media.setAnimation(SnackbarShow);
+        mUri = uri;
+        String scheme = mUri.getScheme();
+        File filePlayer = new File(mUri.getPath());
+        DecimalFormat decimalFormat = new DecimalFormat("##.##");
+        double size = filePlayer.length() / 1024;
+        String length = "" + decimalFormat.format(size) + "kb";
+        final MediaPlayer mediaPlayer = new MediaPlayer();
+
+        try {
+            mediaPlayer.setDataSource(filePlayer.getAbsolutePath());
+            mediaPlayer.prepare();
+            duration = mediaPlayer.getDuration();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        mTextLine1 = (TextView) findViewById(R.id.line1);
+        mTextLine2 = (TextView) findViewById(R.id.line2);
+        mTextTimer = (TextView) findViewById(R.id.txt_timer);
+        mLoadingText = (TextView) findViewById(R.id.loading);
+        mTextSize = (TextView) findViewById(R.id.txtsize);
+        closePlayer = (ImageButton) findViewById(R.id.close_player);
+        closePlayer.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stopPlayback();
+                layout_media.setAnimation(SnackbarHide);
+                layout_media.setVisibility(View.GONE);
+
+            }
+        });
+        mTextLine1.setText(filePlayer.getName());
+        mTextSize.setText("Size: " + "" + length);
+
+        if (scheme.equals("http")) {
+            String msg = getString(R.string.streamloadingtext, mUri.getHost());
+            mLoadingText.setText(msg);
+        } else {
+            mLoadingText.setVisibility(View.GONE);
+        }
+        mSeekBar = (SeekBar) findViewById(R.id.progress);
+        mProgressRefresher = new Handler();
+        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        PreviewPlayer player = (PreviewPlayer) getLastNonConfigurationInstance();
+        if (player == null) {
+            mPlayer = new PreviewPlayer();
+            mPlayer.setActivity(this);
+            try {
+                mPlayer.setDataSourceAndPrepare(uri);
+            } catch (Exception ex) {
+                Toast.makeText(this, R.string.playback_failed, Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } else {
+            mPlayer = player;
+            mPlayer.setActivity(this);
+            if (mPlayer.isPrepared()) {
+                showPostPrepareUI();
+            }
+        }
+
+        timer();
+
+
+        AsyncQueryHandler mAsyncQueryHandler = new AsyncQueryHandler(getContentResolver()) {
+            @Override
+            protected void onQueryComplete(int token, Object cookie, Cursor cursor) {
+                if (cursor != null && cursor.moveToFirst()) {
+
+                    int titleIdx = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
+                    int artistIdx = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
+                    int idIdx = cursor.getColumnIndex(MediaStore.Audio.Media._ID);
+                    int displaynameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+
+                    if (idIdx >= 0) {
+                        mMediaId = cursor.getLong(idIdx);
+                    }
+
+                    if (titleIdx >= 0) {
+                        String title = cursor.getString(titleIdx);
+                        mTextLine1.setText(title);
+                        if (artistIdx >= 0) {
+                            String artist = cursor.getString(artistIdx);
+                            mTextLine2.setText(artist);
+                        }
+                    } else if (displaynameIdx >= 0) {
+                        String name = cursor.getString(displaynameIdx);
+                        mTextLine1.setText(name);
+                    } else {
+                        // Couldn't find anything to display, what to do now?
+                    }
+                } else {
+                }
+
+                if (cursor != null) {
+                    cursor.close();
+                }
+                setNames();
+            }
+        };
+
+        if (scheme.equals(ContentResolver.SCHEME_CONTENT)) {
+            if (uri.getAuthority() == MediaStore.AUTHORITY) {
+                // try to get title and artist from the media content provider
+                mAsyncQueryHandler.startQuery(0, null, uri, new String[]{
+                                MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST},
+                        null, null, null);
+            } else {
+                // Try to get the display name from another content provider.
+                // Don't specifically ask for the display name though, since the
+                // provider might not actually support that column.
+                mAsyncQueryHandler.startQuery(0, null, uri, null, null, null, null);
+            }
+        } else if (scheme.equals("file")) {
+            // check if this file is in the media database (clicking on a download
+            // in the download manager might follow this path
+            String path = uri.getPath();
+            mAsyncQueryHandler.startQuery(0, null, MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    new String[]{MediaStore.Audio.Media._ID,
+                            MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST},
+                    MediaStore.Audio.Media.DATA + "=?", new String[]{path}, null);
+        } else {
+            // We can't get metadata from the file/stream itself yet, because
+            // that API is hidden, so instead we display the URI being played
+            if (mPlayer.isPrepared()) {
+                setNames();
+            }
+        }
+    }
+
+    private void showPostPrepareUI() {
+        mDuration = mPlayer.getDuration();
+        if (mDuration != 0) {
+            mSeekBar.setMax(mDuration);
+            mSeekBar.setVisibility(View.VISIBLE);
+        }
+        mSeekBar.setOnSeekBarChangeListener(mSeekListener);
+        mLoadingText.setVisibility(View.GONE);
+        View v = findViewById(R.id.titleandbuttons);
+        v.setVisibility(View.VISIBLE);
+        mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+        mProgressRefresher.postDelayed(new ProgressRefresher(), 200);
+        updatePlayPause();
+    }
+
+    private void timer() {
+        final Timer timer = new Timer();
+        countTimer = 0;
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (countTimer <= duration / 1000) {
+                            String s_time = String.format("%02d:%02d:%02d",
+                                    countTimer / 3600,
+                                    (countTimer % 3600) / 60,
+                                    countTimer % 60);
+                            mTextTimer.setText(s_time + "/" + StringFormatUtils.formatDuration(duration));
+                            if (!ispause) {
+                                countTimer++;
+                            }
+                            if (countTimer == duration / 1000 + 1) {
+                                timer.cancel();
+                            }
+                        }
+
+                    }
+                });
+            }
+        }, 0, 1000);
+    }
+
+    private void start() {
+        mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+        mPlayer.start();
+        mProgressRefresher.postDelayed(new ProgressRefresher(), 200);
+    }
+
+    public void setNames() {
+        if (TextUtils.isEmpty(mTextLine1.getText())) {
+            mTextLine1.setText(mUri.getLastPathSegment());
+        }
+        if (TextUtils.isEmpty(mTextLine2.getText())) {
+            mTextLine2.setVisibility(View.GONE);
+        } else {
+            mTextLine2.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void updatePlayPause() {
+        ImageButton b = (ImageButton) findViewById(R.id.playpause);
+        if (b != null) {
+            if (mPlayer.isPlaying()) {
+                b.setBackgroundResource(R.drawable.ic_pause_player);
+                //b.setImageResource(R.drawable.ic_action_pause);
+            } else {
+                b.setBackgroundResource(R.drawable.ic_play_player);
+                //b.setImageResource(R.drawable.ic_action_play);
+                mProgressRefresher.removeCallbacksAndMessages(null);
+            }
+        }
     }
 
     /**
@@ -1276,7 +1730,6 @@ public class FormEntryActivity extends CommonActivity implements
         }
     }
 
-
     public void reInit(Uri uri, boolean newFamily) {
         mBeenSwiped = false;
         Collect.getInstance().setFormController(null);
@@ -1308,11 +1761,7 @@ public class FormEntryActivity extends CommonActivity implements
         if (!newFamily) {
             mReFormLoaderTask = new ReFormLoaderTask();
             mReFormLoaderTask.setFormLoaderListener(this);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-                mReFormLoaderTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, mFormPath);
-            } else {
-                mReFormLoaderTask.execute(mFormPath);
-            }
+            mReFormLoaderTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, mFormPath);
 
             SurveyCollectorUtils.cleanLatestInstanceConfig();
 
@@ -1522,7 +1971,8 @@ public class FormEntryActivity extends CommonActivity implements
                     }
                     invalidateOptionsMenu();
                 }
-                refreshCurrentView();
+
+                //refreshCurrentView();
             }
             return;
         }
@@ -1562,6 +2012,7 @@ public class FormEntryActivity extends CommonActivity implements
                 }
 
                 String sb = intent.getStringExtra("SCAN_RESULT");
+                action_qrapi = intent.getStringExtra("SCAN_ACTION");
                 ((RTAView) mCurrentView).setBinaryData(sb, index);
                 if (isCombo) {
                     String questionName = intent.getStringExtra(RTAView.REFER_QUESTION_COMBO);
@@ -1639,20 +2090,20 @@ public class FormEntryActivity extends CommonActivity implements
                     e.printStackTrace();
                 }
                 Uri imageURI = intent.getData();
-
-                String pathImageLegacy = imageURI.getPath();
-                //RTALog.d("test image", " test path is = " + pathImageLegacy);
-                File ifiLegacy = new File(pathImageLegacy);
-                String miInstanceFolderLegacy = mFormController.getInstancePath().getParent();
+                if (imageURI != null) {
+                    String pathImageLegacy = imageURI.getPath();
+                    //RTALog.d("test image", " test path is = " + pathImageLegacy);
+                    File ifiLegacy = new File(pathImageLegacy);
+                    String miInstanceFolderLegacy = mFormController.getInstancePath().getParent();
 //                String isLegacy = miInstanceFolderLegacy + File.separator
 //                        + System.currentTimeMillis() + ".jpg";
-                String isLegacy = miInstanceFolderLegacy + File.separator
-                        + System.currentTimeMillis();
+                    String isLegacy = miInstanceFolderLegacy + File.separator
+                            + System.currentTimeMillis();
 
-                File infLegacy = new File(isLegacy);
-                if (!infLegacy.exists()) {
-                    Log.e(t, ifiLegacy.getAbsolutePath() + " this is not exists");
-                }
+                    File infLegacy = new File(isLegacy);
+                    if (!infLegacy.exists()) {
+                        Log.e(t, ifiLegacy.getAbsolutePath() + " this is not exists");
+                    }
                /* if (!ifiLegacy.renameTo(infLegacy)) {
                     Log.e(t, "Failed to rename " + ifiLegacy.getAbsolutePath());
                 } else {
@@ -1661,17 +2112,22 @@ public class FormEntryActivity extends CommonActivity implements
                                     + infLegacy.getAbsolutePath());
                 }
                 ifiLegacy.delete();*/
-                try {
-                    org.apache.commons.io.FileUtils.moveFile(ifiLegacy, infLegacy);
-                } catch (IOException e) {
-                    Log.e(t, "Failed to move file to " + infLegacy.getAbsolutePath());
-                    e.printStackTrace();
+                    try {
+                        org.apache.commons.io.FileUtils.moveFile(ifiLegacy, infLegacy);
+                    } catch (IOException e) {
+                        Log.e(t, "Failed to move file to " + infLegacy.getAbsolutePath());
+                        e.printStackTrace();
+                        break;
+                    }
+                    ((RTAView) mCurrentView).setBinaryData(infLegacy, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                    break;
+                } else {
+                    ((RTAView) mCurrentView).setBinaryData(null, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
                     break;
                 }
 
-                ((RTAView) mCurrentView).setBinaryData(infLegacy, index);
-                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-                break;
             case INLINEIMAGE_CAPTURE:
                 try {
                     index = intent.getStringExtra(RTAView.BINARY_QUESTION_INDEX);
@@ -1679,29 +2135,34 @@ public class FormEntryActivity extends CommonActivity implements
                     e.printStackTrace();
                 }
                 Uri inline_imageURI = intent.getData();
-
-                String pathImage = inline_imageURI.getPath();
+                if (inline_imageURI != null) {
+                    String pathImage = inline_imageURI.getPath();
 //                RTALog.d("test image", " test paht is = " + pathImage);
-                File ifi = new File(pathImage);
-                String miInstanceFolder = mFormController.getInstancePath()
-                        .getParent();
+                    File ifi = new File(pathImage);
+                    String miInstanceFolder = mFormController.getInstancePath()
+                            .getParent();
 //                String is = miInstanceFolder + File.separator
 //                        + System.currentTimeMillis() + ".jpg";
-                String is = miInstanceFolder + File.separator
-                        + System.currentTimeMillis();
+                    String is = miInstanceFolder + File.separator
+                            + System.currentTimeMillis();
 
-                File inf = new File(is);
-                if (!ifi.renameTo(inf)) {
-                    Log.e(t, "Failed to rename " + ifi.getAbsolutePath());
+                    File inf = new File(is);
+                    if (!ifi.renameTo(inf)) {
+                        Log.e(t, "Failed to rename " + ifi.getAbsolutePath());
+                    } else {
+                        Log.i(t,
+                                "renamed " + ifi.getAbsolutePath() + " to "
+                                        + inf.getAbsolutePath());
+                    }
+                    ifi.delete();
+                    ((RTAView) mCurrentView).setBinaryData(inf, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                    break;
                 } else {
-                    Log.i(t,
-                            "renamed " + ifi.getAbsolutePath() + " to "
-                                    + inf.getAbsolutePath());
+                    ((RTAView) mCurrentView).setBinaryData(null, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                    break;
                 }
-                ifi.delete();
-                ((RTAView) mCurrentView).setBinaryData(inf, index);
-                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-                break;
             case ALIGNED_IMAGE:
             /*
              * We saved the image to the tempfile_path; the app returns the full
@@ -1846,28 +2307,29 @@ public class FormEntryActivity extends CommonActivity implements
                 // then the widget copies the file and makes a new entry in the
                 // content provider.
                 Uri capturedVideo = intent.getData();
+                if (capturedVideo != null) {
+                    String pathSrcVideo = capturedVideo.getPath();
+                    File srcVideoFile = new File(pathSrcVideo);
+                    String instanceFolderVideo = mFormController.getInstancePath()
+                            .getParent();
+                    String pathDestVideo = instanceFolderVideo + File.separator
+                            + System.currentTimeMillis();
 
-                String pathSrcVideo = capturedVideo.getPath();
-                File srcVideoFile = new File(pathSrcVideo);
-                String instanceFolderVideo = mFormController.getInstancePath()
-                        .getParent();
-                String pathDestVideo = instanceFolderVideo + File.separator
-                        + System.currentTimeMillis();
+                    File destVideoFile = new File(pathDestVideo);
+                    if (!destVideoFile.exists()) {
+                        Log.e(t, destVideoFile.getAbsolutePath() + " this is not exists");
+                    }
 
-                File destVideoFile = new File(pathDestVideo);
-                if (!destVideoFile.exists()) {
-                    Log.e(t, destVideoFile.getAbsolutePath() + " this is not exists");
+                    try {
+                        org.apache.commons.io.FileUtils.moveFile(srcVideoFile, destVideoFile);
+                    } catch (IOException e) {
+                        Log.e(t, "Failed to move file to " + destVideoFile.getAbsolutePath());
+                        e.printStackTrace();
+                        break;
+                    }
+                    ((RTAView) mCurrentView).setBinaryData(destVideoFile, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
                 }
-
-                try {
-                    org.apache.commons.io.FileUtils.moveFile(srcVideoFile, destVideoFile);
-                } catch (IOException e) {
-                    Log.e(t, "Failed to move file to " + destVideoFile.getAbsolutePath());
-                    e.printStackTrace();
-                    break;
-                }
-                ((RTAView) mCurrentView).setBinaryData(destVideoFile, index);
-                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
                 break;
             case AUDIO_CHOOSER:
             case VIDEO_CHOOSER:
@@ -1928,26 +2390,33 @@ public class FormEntryActivity extends CommonActivity implements
                 }
 
                 Uri imedia_v = intent.getData();
-                String pathVideo = imedia_v.getPath();
-                File srcFile = new File(pathVideo);
-                String videoInstancePath = mFormController.getInstancePath().getParent() + File.separator + System.currentTimeMillis();
+                if (imedia_v != null) {
+                    String pathVideo = imedia_v.getPath();
+                    File srcFile = new File(pathVideo);
+                    String videoInstancePath = mFormController.getInstancePath().getParent() + File.separator + System.currentTimeMillis();
 
-                File destFile = new File(videoInstancePath);
+                    File destFile = new File(videoInstancePath);
 
-                if (!srcFile.renameTo(destFile)) {
-                    Log.e(t, "Failed to rename " + srcFile.getAbsolutePath());
+                    if (!srcFile.renameTo(destFile)) {
+                        Log.e(t, "Failed to rename " + srcFile.getAbsolutePath());
+                    } else {
+                        Log.i(t,
+                                "renamed " + srcFile.getAbsolutePath() + " to "
+                                        + destFile.getAbsolutePath());
+                    }
+                    if (srcFile.exists()) {
+                        srcFile.delete();
+                    }
+
+                    ((RTAView) mCurrentView).setBinaryData(destFile, index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                    break;
                 } else {
-                    Log.i(t,
-                            "renamed " + srcFile.getAbsolutePath() + " to "
-                                    + destFile.getAbsolutePath());
-                }
-                if (srcFile.exists()) {
-                    srcFile.delete();
+                    ((RTAView) mCurrentView).setBinaryData(" ", index);
+                    saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                    break;
                 }
 
-                ((RTAView) mCurrentView).setBinaryData(destFile, index);
-                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-                break;
             case LOCATION_CAPTURE:
                 try {
                     index = intent.getStringExtra(RTAView.BINARY_QUESTION_INDEX);
@@ -1978,7 +2447,7 @@ public class FormEntryActivity extends CommonActivity implements
                 ((RTAView) mCurrentView).setBinaryData(bearing, index);
                 saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
                 break;
-            case INLINEIMAGE_ALBUM_CAPTURE:
+            /*case INLINEIMAGE_ALBUM_CAPTURE: {
                 try {
                     index = intent.getStringExtra(RTAView.BINARY_QUESTION_INDEX);
                 } catch (Exception e) {
@@ -1989,14 +2458,102 @@ public class FormEntryActivity extends CommonActivity implements
                 //cut tag and copy to file no tag
                 String[] arrayName = cutTagImageName(imageList);
 
-
                 imageList = Arrays.toString(arrayName).replace(",", "");
                 imageList = imageList.replace("[", "");
                 imageList = imageList.replace("]", "");
                 ((RTAView) mCurrentView).setBinaryData(imageList, index);
                 saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-                mFormController.saveAlbumImage();
+                //mFormController.saveAlbumImage();
                 break;
+            }*/
+            case ALBUM_CAPTURE: {
+                FormIndex albumPromptIndex =
+                        (FormIndex) intent.getSerializableExtra(RTAView.BINARY_QUESTION_INDEX);
+                FormIndex albumIndex = albumPromptIndex;
+                if (albumPromptIndex != null) {
+                    String result = intent.getStringExtra("result");
+                    String[] imgNameArray = cutTagImageName(result);
+
+                    FormIndex beforeIndex = mFormController.getFormIndex();
+                    for (String img : imgNameArray) {
+                        mFormController.newRepeat(albumIndex);
+                        mFormController.jumpToIndex(albumIndex);
+                        int event = mFormController.stepToNextEvent(true);
+                        if (event == FormEntryController.EVENT_QUESTION) {
+                            FormIndex dataIndex = mFormController.getFormIndex();
+                            IAnswerData data = new StringData(img);
+                            try {
+                                mFormController.saveAnswer(dataIndex, data);
+                            } catch (JavaRosaException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        mFormController.stepToNextEvent(true);
+                        albumIndex = mFormController.getFormIndex();
+                    }
+
+                    for (WidgetAlternative wa : ((RTAView) mCurrentView).getWidgetAlternatives()) {
+                        if (wa.getPrompt().getFormIndex().equals(albumPromptIndex)) {
+                            wa.getPrompt().setFormIndex(albumIndex);
+                            if (wa instanceof AlbumControlView) {
+                                ((AlbumControlView) wa).updateThumbnailView();
+                            }
+                            break;
+                        }
+                    }
+                    mFormController.jumpToIndex(beforeIndex);
+                }
+
+                break;
+            }
+            case ALBUM_UPDATE: {
+                FormIndex albumPromptIndex =
+                        (FormIndex) intent.getSerializableExtra(RTAView.BINARY_QUESTION_INDEX);
+                List<String> deleteImages = intent.getStringArrayListExtra("deleted_images");
+                if (albumPromptIndex != null && deleteImages != null && deleteImages.size() > 0) {
+                    FormIndex albumIndex = albumPromptIndex;
+                    FormIndex beforeIndex = mFormController.getFormIndex();
+                    mFormController.jumpToIndex(albumIndex);
+
+                    // move back to repeat event
+                    while (mFormController.stepToPreviousEvent() == FormEntryController.EVENT_REPEAT) {
+                        // move forward to question data next to repeat event
+                        int e = mFormController.getmFormEntryController().stepToNextEvent();
+                        if (e == FormEntryController.EVENT_QUESTION) {
+                            FormIndex i = mFormController.getFormIndex();
+                            FormEntryPrompt p = mFormController.getQuestionPrompt(i);
+                            if (p != null) {
+                                String answer = p.getAnswerText();
+                                if (answer != null && !answer.equals("") && deleteImages.contains(answer)) {
+                                    mFormController.deleteRepeat();
+                                    deleteImages.remove(answer);
+                                    continue;
+                                }
+                            }
+                        }
+                        // to repeat event, in order to continue traversal
+                        mFormController.stepToPreviousEvent();
+                    }
+
+                    // step next to find the new prompt_new_repeat index
+                    while (mFormController.getmFormEntryController().stepToNextEvent() != FormEntryController.EVENT_PROMPT_NEW_REPEAT)
+                        ;
+                    albumIndex = mFormController.getFormIndex();
+
+                    for (WidgetAlternative wa : ((RTAView) mCurrentView).getWidgetAlternatives()) {
+                        if (wa.getPrompt().getFormIndex().equals(albumPromptIndex)) {
+                            wa.getPrompt().setFormIndex(albumIndex);
+                            if (wa instanceof AlbumControlView) {
+                                ((AlbumControlView) wa).updateThumbnailView();
+                            }
+                            break;
+                        }
+                    }
+                    mFormController.jumpToIndex(beforeIndex);
+                }
+
+                break;
+            }
             case INLINEVIDEO_ALBUMM_CAPTURE:
                 try {
                     index = intent.getStringExtra(RTAView.BINARY_QUESTION_INDEX);
@@ -2036,6 +2593,11 @@ public class FormEntryActivity extends CommonActivity implements
                 ((RTAView) mCurrentView).setBinaryData(traceExtra, traceIndex);
                 saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
                 break;
+            case VIDEO_PLAYER:
+                boolean DeletePlayer = intent.getBooleanExtra("IsDelete", false);
+                ((RTAView) mCurrentView).setBinaryData(DeletePlayer);
+                saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
+                break;
         }
         //refresh screen set answer and show new question if have relevant
         refreshCurrentView(index);
@@ -2044,7 +2606,7 @@ public class FormEntryActivity extends CommonActivity implements
 
     private String[] cutTagImageName(String imageList) {
         String[] arrayList = imageList.split(" ");
-        String mInstanceFolder = Collect.getInstance().getFormController().getInstancePath().getParent();
+        String mInstanceFolder = mFormController.getInstancePath().getParent();
         for (int i = 0; i < arrayList.length; i++) {
             String beginName = arrayList[i];
             if (arrayList[i].contains(".")) {
@@ -2052,8 +2614,8 @@ public class FormEntryActivity extends CommonActivity implements
             }
 
             //Copy here
-            String selectdImage = mInstanceFolder + File.separator + beginName;
-            Uri uriImage = Uri.fromFile(new File(selectdImage));
+            String selectedImage = mInstanceFolder + File.separator + beginName;
+            Uri uriImage = Uri.fromFile(new File(selectedImage));
 
             if (!beginName.equals(arrayList[i])) {
                 try {
@@ -2079,7 +2641,6 @@ public class FormEntryActivity extends CommonActivity implements
         return arrayList;
     }
 
-    //refreh current view when remove answer
     public void refreshCurrentView(String index) throws RuntimeException {
         FormEntryCaption[] groups = mFormController
                 .getGroupsForCurrentIndex();
@@ -2125,23 +2686,24 @@ public class FormEntryActivity extends CommonActivity implements
         if (mustRefesh) {
             saveAnswersForCurrentScreen(false);
             refreshCurrentView();
+            setupUIForNavigationButton();
         } else {
-            for (String s : mFormController.getIndexRelevants()) {
-                if (s.contains(index.toString())) {
-                    saveAnswersForCurrentScreen(false);
-                    try {
-                        RFormEntryPrompt[] prompts = mFormController.getQuestionPrompts();
-                        ((RTAView) mCurrentView).refreshView(prompts);
-                    } catch (RuntimeException e) {
-                        e.printStackTrace();
-                        createErrorDialog(e.getMessage(), DO_NOT_EXIT);
-                    }
-                    return;
+
+            saveAnswersForCurrentScreen(false);
+            if (mFormController.getModel().isIndexRelevant(index)) {
+                try {
+                    RFormEntryPrompt[] prompts = mFormController.getQuestionPrompts();
+                    ((RTAView) mCurrentView).refreshView(prompts);
+                    setupUIForNavigationButton();
+                } catch (RuntimeException e) {
+                    e.printStackTrace();
+                    createErrorDialog(e.getMessage(), DO_NOT_EXIT);
                 }
+                return;
             }
             //only refresh label
-            saveAnswersForCurrentScreen(false);
             updateLabelAndResetXpath();
+            setupUIForNavigationButton();
         }
     }
 
@@ -2173,15 +2735,12 @@ public class FormEntryActivity extends CommonActivity implements
         setProgress(mFormController.getPercentOfForm(), (mFormController.getQuestionsHaveFill().size() / (float) mFormController.getQuestionsList().size()) * 100);
     }
 
-
     /**
      * Refreshes the current view. the controller and the displayed view can get
      * out of sync due to dialogs and restarts caused by screen orientation
      * changes, so they're resynchronized here.
      */
     public void refreshCurrentView() {
-        if (RTASurvey.DEBUG) {
-        }
         int event = mFormController.getEvent();
 
         // When we refresh, repeat dialog state isn't maintained, so step back
@@ -2198,16 +2757,11 @@ public class FormEntryActivity extends CommonActivity implements
         if (event == FormEntryController.EVENT_PROMPT_NEW_REPEAT) {
             createRepeatDialog();
         } else {
-            if (event == FormEntryController.EVENT_END_OF_FORM) {
-                if (existEndSurvey) {
-                }
-            }
             View current = createView(event, false);
             showView(current, AnimationType.FADE);
         }
         setProgress(mFormController.getPercentOfForm(), (mFormController.getQuestionsHaveFill().size() / (float) mFormController.getQuestionsList().size()) * 100);
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -2242,7 +2796,7 @@ public class FormEntryActivity extends CommonActivity implements
         CompatibilityUtils.setShowAsAction(
                 menu.add(0, MENU_LANGUAGES, 0, R.string.change_language)
                         .setIcon(R.drawable.ic_language_white_24dp),
-                MenuItem.SHOW_AS_ACTION_NEVER);
+                MenuItem.SHOW_AS_ACTION_IF_ROOM);
 
         CompatibilityUtils.setShowAsAction(
                 menu.add(0, MENU_PREFERENCES, 0, R.string.general_preferences)
@@ -2310,7 +2864,7 @@ public class FormEntryActivity extends CommonActivity implements
         menu.findItem(MENU_QUICK_NOTE).setVisible(!usability)
                 .setEnabled(!usability);
 
-        usability = PreferencesManager.getPreferencesManager(this).getBooleanInAdmin(
+        usability = PreferencesManager.getPreferencesManager(this).getBoolean(
                 AdminPreferencesActivity.KEY_SAVE_MID, true);
 
         if (usability) {
@@ -2318,13 +2872,13 @@ public class FormEntryActivity extends CommonActivity implements
         }
         menu.findItem(MENU_SAVE).setVisible(usability).setEnabled(usability);
 
-        usability = PreferencesManager.getPreferencesManager(this).getBooleanInAdmin(
+        usability = PreferencesManager.getPreferencesManager(this).getBoolean(
                 AdminPreferencesActivity.KEY_JUMP_TO, true);
 
         menu.findItem(MENU_HIERARCHY_VIEW).setVisible(usability)
                 .setEnabled(usability);
 
-        usability = PreferencesManager.getPreferencesManager(this).getBooleanInAdmin(
+        usability = PreferencesManager.getPreferencesManager(this).getBoolean(
                 AdminPreferencesActivity.KEY_CHANGE_LANGUAGE, true)
                 && (mFormController != null)
                 && mFormController.getLanguages() != null
@@ -2339,12 +2893,12 @@ public class FormEntryActivity extends CommonActivity implements
         menu.findItem(MENU_PREFERENCES).setVisible(usability)
                 .setEnabled(usability);
 
-        usability = PreferencesManager.getPreferencesManager(this).getBooleanInAdmin(_PreferencesActivity.KEY_DISABLE_REPORTISSUE, false);
+        usability = PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_DISABLE_REPORTISSUE, false);
 
         menu.findItem(MENU_IMAGE_REPORT).setVisible(!usability)
                 .setEnabled(!usability);
 
-        usability = PreferencesManager.getPreferencesManager(this).getBooleanInAdmin(_PreferencesActivity.KEY_DISABLE_QA_CHECK, false);
+        usability = PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_DISABLE_QA_CHECK, false);
         if (!usability) {
             usability = getIntent().getBooleanExtra(SurveyUiIntents.UI_INTENT_EXTRA_IS_READ_ONLY, false);
         }
@@ -2494,8 +3048,9 @@ public class FormEntryActivity extends CommonActivity implements
                 ActivityLogManager.InsertChangeScreenLog(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_DIALOG_ADD_REPEAT_GROUP);
                 return true;
             case MENU_FONT_SIZE:
+                boolean changeTextFont = PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_CHANGE_FONTSIZE, false);
                 String question_font = PreferencesManager.getPreferencesManager(Collect.getInstance()).getString(PreferencesActivity.KEY_FONT_SIZE,
-                        Collect.DEFAULT_FONTSIZE);
+                        Collect.DEFAULT_FONTSIZE, changeTextFont);
                 int questionFontsize = Integer.valueOf(question_font);
                 final Dialog fontSize_dialog = new Dialog(this);
                 DisplayMetrics displaymetrics = new DisplayMetrics();
@@ -2664,7 +3219,6 @@ public class FormEntryActivity extends CommonActivity implements
      * etc...), true otherwise.
      */
     public boolean saveAnswersForCurrentScreen(boolean evaluateConstraints) {
-
         if (isViewOnly) {
             return true;
         }
@@ -2706,18 +3260,39 @@ public class FormEntryActivity extends CommonActivity implements
                         }
                     }
 
-                    List<FailedConstraint> constraint = mFormController
-                            .saveAllScreenAnswers(answers, evaluateConstraints, true);
+                    List<FailedConstraint> constraint = mFormController.saveAllScreenAnswers(answers, evaluateConstraints, true);
                     if (constraint != null && constraint.size() > 0) {
                         resetQuestion();
-                        for (int i = 0; i < constraint.size(); i++) {
-                            createConstraint(constraint.get(i).index, constraint.get(i).status);
+                        listConfirmRead.clear();
+                        String tooltip = PreferencesManager.getPreferencesManager(Collect.getInstance()).getString(PreferencesActivity.KEY_CHANGE_TOOLTIP,
+                                Collect.DEFAULT_TOOLTIP);
+                        if (tooltip.equals("1")) {
+                            if (countSave == 0) {
+                                createConstraintToast(constraint.get(0).index, constraint.get(0).status);
+                            }
+                            if (countSave == 1) {
+                                setCountSave(0);
+                            }
+
+                        } else if (tooltip.equals("2")) {
+                            for (int i = 0; i < constraint.size(); i++) {
+                                createConstraint(constraint.get(i).index, constraint.get(i).status);
+                            }
+                            if (listConfirmRead.size() > 0) {
+                                if (countSave == 0) {
+                                    createContraintDialog(listConfirmRead.get(0));
+                                }
+                                if (countSave == 1) {
+                                    setCountSave(0);
+                                }
+
+                            }
                         }
                         return false;
                     }
+
                     return true;
-                }
-                else {
+                } else {
                     Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
                 }
             } catch (JavaRosaException e) {
@@ -2764,7 +3339,6 @@ public class FormEntryActivity extends CommonActivity implements
         return check;
     }
 
-
     /**
      * Clears the answer on the screen.
      */
@@ -2806,21 +3380,6 @@ public class FormEntryActivity extends CommonActivity implements
                     break;
                 }
             }
-        }
-        else {
-            Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
-        }
-    }
-
-    public void removeAnswerWithConfirmDialog(int id) {
-        if (mCurrentView instanceof RTAView) {
-            for (QuestionWidget qw : ((RTAView) mCurrentView).getWidgets()) {
-                if (id == qw.getId()) {
-                    ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_CLEAR_DIALOG, " question : " + qw.getPrompt().getIndex());
-                    createClearDialog(qw);
-                    break;
-                }
-            }
         } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
@@ -2839,8 +3398,6 @@ public class FormEntryActivity extends CommonActivity implements
                                 + mFormController.getUuid()
                                 + "\"", null);
     }
-
-    private FormIndex formIndexClear = null;
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View v,
@@ -2868,7 +3425,6 @@ public class FormEntryActivity extends CommonActivity implements
         menu.setHeaderTitle(getString(R.string.edit_prompt));
     }
 
-
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         /*
@@ -2885,8 +3441,7 @@ public class FormEntryActivity extends CommonActivity implements
                     break;
                 }
             }
-        }
-        else {
+        } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
 
@@ -2897,7 +3452,6 @@ public class FormEntryActivity extends CommonActivity implements
 
         return super.onContextItemSelected(item);
     }
-
 
     @Override
     public Object onRetainCustomNonConfigurationInstance() {
@@ -2923,34 +3477,24 @@ public class FormEntryActivity extends CommonActivity implements
         return null;
     }
 
-    /**
-     * Creates a view given the View type and an event
-     *
-     * @param event
-     * @param advancingPage -- true if this results from advancing through the form
-     * @return newly created View
-     */
     private View createView(int event, boolean advancingPage) {
         PreferencesManager pre = PreferencesManager.getPreferencesManager(this);
-
         if (getLocalDatabase() != null && event != FormEntryController.EVENT_BEGINNING_OF_FORM) {
             instancePoolManager.insertLocalData(getLocalDatabase(), mFormController, false);
         }
-
+        setupUIForNavigationButton();
         if (timeStart.equals("")) {
             timeStart = StringFormatUtils.getDate(System.currentTimeMillis(),
                     "dd/MM/yyyy hh:mm:ss");
             timeStartmilis = System.currentTimeMillis();
         }
+        boolean welcome_screen = pre.getBoolean(_PreferencesActivity.KEY_WELCOME_SCREEN, true);
         switch (event) {
             case FormEntryController.EVENT_BEGINNING_OF_FORM:
                 String uuid = StringFormatUtils.getUUIDInstancePath(this,
                         mFormController.getInstancePath().getAbsolutePath());
-                boolean welcome_screen = pre.getBoolean(_PreferencesActivity.KEY_WELCOME_SCREEN, true);
                 ActivityLogManager.InsertChangeScreenLog(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_BEGIN_SCREEN);
-                RelativeLayout.LayoutParams param = (RelativeLayout.LayoutParams) mQuestionHolder.getLayoutParams();
-                View startView = View
-                        .inflate(this, R.layout.form_entry_start, null);
+                View startView = View.inflate(this, R.layout.form_entry_start, null);
                 if (welcome_screen) {   //display welcome screen and save form
                     Drawable image = null;
                     File mediaFolder = mFormController.getMediaFolder();
@@ -3005,7 +3549,6 @@ public class FormEntryActivity extends CommonActivity implements
                         is.setVisibility(View.GONE);
                         ib.setVisibility(View.GONE);
                         ia.setVisibility(View.GONE);
-//                        tb.setVisibility(View.GONE);
                         d.setText(getString(R.string.buttons_instructions,
                                 mFormController.getFormTitle()));
                     } else {
@@ -3013,13 +3556,7 @@ public class FormEntryActivity extends CommonActivity implements
                                 mFormController.getFormTitle()));
                     }
 
-                    if (mBackButton.isShown()) {
-                        mBackButton.setEnabled(false);
-                    }
-                    if (mNextButton.isShown()) {
-                        mNextButton.setEnabled(true);
-                    }
-
+                    skipValidate = true;
                     if (uuid == null && Intent.ACTION_EDIT.equals(getIntent().getAction())
                             && getIntent().getData() != null
                             && getIntent().getData().toString().contains(FormsProviderAPI.AUTHORITY)) {
@@ -3028,6 +3565,7 @@ public class FormEntryActivity extends CommonActivity implements
                     if (Intent.ACTION_PICK.equals(getIntent().getAction())) {
                         saveDataToDisk(false, false, null);
                     }
+                    skipValidate = false;
                     return startView;
                 } else {    //save new form and move to next screen
                     if (uuid == null && Intent.ACTION_EDIT.equals(getIntent().getAction())
@@ -3201,6 +3739,7 @@ public class FormEntryActivity extends CommonActivity implements
                         ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.BUTTON_SAVE_COMPLETE, "");
                         String uuid = mFormController.getUuid();//StringFormatUtils.getUUIDInstancePath(RTASurvey.getInstance().getActivity(), RTASurvey.getInstance().getFormController().getInstancePath().getAbsolutePath());
                         updateInstanceplushInfor();
+
                         if (QACheckPointData.getNoErrorOfInstance(uuid) > 0 && !isViewOnly) {
                             QACheckPointViewManager checkNoteManager = QACheckPointViewManager.getInstance();
                             checkNoteManager.showCheckNote();
@@ -3208,6 +3747,8 @@ public class FormEntryActivity extends CommonActivity implements
                             total = StringFormatUtils.getTime(System.currentTimeMillis() - timeStartmilis);
                             // Form is marked as 'saved' here.
                             if (saveAs.getText().length() < 1) {
+                                Toast.makeText(FormEntryActivity.this, R.string.save_as_error,
+                                        Toast.LENGTH_SHORT).show();
 
                             } else {
                                 if (!send_working) {
@@ -3224,9 +3765,10 @@ public class FormEntryActivity extends CommonActivity implements
                                                 .toString(), RTASurvey.STATUS_PENDING_SEND_FINALIZE);
 
                                     }
-                                    RTASurvey.getInstance().getWorkingDataHelper().closeDatabase();
                                 }
                             }
+
+                            RTASurvey.getInstance().getWorkingDataHelper().closeDatabase();
                         }
                     }
                 });
@@ -3242,14 +3784,6 @@ public class FormEntryActivity extends CommonActivity implements
                     saveButtonFinalize.setEnabled(true);
                     saveButtonFinalize.setClickable(true);
                 }
-
-                if (mBackButton.isShown()) {
-                    mBackButton.setEnabled(true);
-                }
-                if (mNextButton.isShown()) {
-                    mNextButton.setEnabled(false);
-                }
-
                 return endView;
             case FormEntryController.EVENT_QUESTION:
             case FormEntryController.EVENT_GROUP:
@@ -3260,31 +3794,28 @@ public class FormEntryActivity extends CommonActivity implements
                     RFormEntryPrompt[] prompts = mFormController.getQuestionPrompts();
                     FormEntryCaption[] groups = mFormController.getGroupsForCurrentIndex();
 
-                    for (FormEntryCaption group : groups) {
-                        String groupName = group.getIndex().getReference().toShortString();
-                        groupName = groupName.substring(0, groupName.indexOf("[") - 1);
-                        if (groupName.equals(vn.rta.survey.android.preference.Constants.SETTING_GROUP_NAME)
-                                || MiniLogFormAction.isInMiniLogGroup(mFormController)) {
+                    if (MiniLogFormAction.isInMiniLogGroup(mFormController)) {
+                        try {
                             try {
+                                event = welcome_screen ? (movingNext ? mFormController.stepToNextScreenEvent()
+                                        : mFormController.stepToPreviousEvent()) : mFormController.stepToNextScreenEvent();
+                            } catch (JavaRosaException e) {
+                                e.printStackTrace();
+                            }
+
+                            if (mFormController.currentPromptIsQuestion())
+                                return createView(event, true);
+                            else {
                                 try {
-                                    event = mFormController.stepToNextScreenEvent();
+                                    event = welcome_screen ? (movingNext ? mFormController.stepToNextScreenEvent()
+                                            : mFormController.stepToPreviousEvent()) : mFormController.stepToNextScreenEvent();
                                 } catch (JavaRosaException e) {
                                     e.printStackTrace();
                                 }
-
-                                if (mFormController.currentPromptIsQuestion())
-                                    return createView(event, true);
-                                else {
-                                    try {
-                                        event = mFormController.stepToNextScreenEvent();
-                                    } catch (JavaRosaException e) {
-                                        e.printStackTrace();
-                                    }
-                                    return createView(event, true);
-                                }
-                            } catch (Exception e) {
-                                e.printStackTrace();
+                                return createView(event, true);
                             }
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
 
@@ -3294,6 +3825,10 @@ public class FormEntryActivity extends CommonActivity implements
 
                 } catch (RuntimeException e) {
                     e.printStackTrace();
+                    if (mFormController.isHaveFirstOrLastScreen(false)) {
+                        createErrorDialog(e.getMessage(), true);
+                        return new View(this);
+                    }
                     try {
                         event = mFormController.stepToNextScreenEvent();
                         createErrorDialog(e.getMessage(), DO_NOT_EXIT);
@@ -3312,11 +3847,6 @@ public class FormEntryActivity extends CommonActivity implements
                         }
                     }
                 }
-
-                if (mBackButton.isShown() && mNextButton.isShown()) {
-                    mBackButton.setEnabled(true);
-                    mNextButton.setEnabled(true);
-                }
                 return rtaView;
             default:
                 // this is badness to avoid a crash.
@@ -3325,13 +3855,31 @@ public class FormEntryActivity extends CommonActivity implements
                     createErrorDialog(getString(R.string.survey_internal_error),
                             EXIT);
                 } catch (JavaRosaException e) {
-                    Log.e(t, e.getMessage(), e);
-                    createErrorDialog(e.getCause().getMessage(), EXIT);
+                    e.printStackTrace();
+                    if (mFormController.isHaveFirstOrLastScreen(false)) {
+                        createErrorDialog(e.getMessage(), true);
+                        return new View(this);
+                    }
                 }
                 return createView(event, advancingPage);
         }
     }
 
+    private void setupUIForNavigationButton() {
+        if (PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_NAVIGATION_BUTTONS, false)) {
+            boolean isHaveFirst = mFormController.isHaveFirstOrLastScreen(true);
+            boolean isHaveLast = mFormController.isHaveFirstOrLastScreen(false);
+            mBackButton.setVisibility(isHaveFirst ? View.GONE : View.VISIBLE);
+            mNextButton.setVisibility(isHaveLast ? View.GONE : View.VISIBLE);
+            if (isHaveFirst && isHaveLast) {
+                mBackButton.setVisibility(View.GONE);
+                mNextButton.setVisibility(View.GONE);
+            }
+        } else {
+            mBackButton.setVisibility(View.GONE);
+            mNextButton.setVisibility(View.GONE);
+        }
+    }
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent mv) {
@@ -3342,6 +3890,18 @@ public class FormEntryActivity extends CommonActivity implements
         handled = mGestureDetector.onTouchEvent(mv);
         return handled;
     }
+
+    // Hopefully someday we can use managed dialogs when the bugs are fixed
+    /*
+     * Ideally, we'd like to use Android to manage dialogs with onCreateDialog()
+	 * and onPrepareDialog(), but dialogs with dynamic content are broken in 1.5
+	 * (cupcake). We do use managed dialogs for our static loading
+	 * ProgressDialog. The main issue we noticed and are waiting to see fixed
+	 * is: onPrepareDialog() is not called after a screen orientation change.
+	 * http://code.google.com/p/android/issues/detail?id=1639
+	 */
+
+    //
 
     public int getActionbarHeight() {
         int actionBarHeight = 0;
@@ -3385,7 +3945,8 @@ public class FormEntryActivity extends CommonActivity implements
                     AnswerOfListSelectionOne answerOfListSelectionOne = AnswerOfListSelectionOne.getInstance();
                     mess = checkingSelectionOne.checkingGroup(answerOfListSelectionOne.getAllAnswer(), true);
                     if (!mess.equals("")) {
-                        ScreenUtils.alertboxError(this, getString(R.string.error), mess, false);
+                        //ScreenUtils.alertboxError(this, getString(R.string.error), mess, false);
+                        createErrorDialog(mess, false);
                         mBeenSwiped = false;
                     }
                 }
@@ -3398,9 +3959,9 @@ public class FormEntryActivity extends CommonActivity implements
             } else {
                 showNextView();
             }
-        } else
+        } else {
             showNextView();
-
+        }
     }
 
     private void createWarningDialog(String message, String action) {
@@ -3509,6 +4070,7 @@ public class FormEntryActivity extends CommonActivity implements
      * answers to the data model after checking constraints.
      */
     public void showNextView() {
+        movingNext = true;
         try {
             //adding for call widget.
             if (CallRecordWidgets.COUNT_CALL != 0) {
@@ -3603,9 +4165,6 @@ public class FormEntryActivity extends CommonActivity implements
         }
     }
 
-    private InstancePoolManager instancePoolManager = InstancePoolManager.getManager();
-    private AggregateLocal aggregateLocal;
-
     public AggregateLocal getLocalDatabase() {
         if (isViewOnly) {
             return null;    // skip local database update when in View-Only mode
@@ -3631,6 +4190,11 @@ public class FormEntryActivity extends CommonActivity implements
      * model without checking constraints.
      */
     public void showPreviousView() {
+        movingNext = false;
+        if (PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_DISABLE_MOVE_TO_PREV_SCREEN, false) && !isViewOnly) {
+            mBeenSwiped = false;
+            return;
+        }
         try {
             ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_PREVIOUS, "");
             // The answer is saved on a back swipe, but question constraints are
@@ -3665,7 +4229,6 @@ public class FormEntryActivity extends CommonActivity implements
                         nonblockingCreateSavePointData();
                     }
                 }
-
                 View next = createView(event, false);
                 showView(next, AnimationType.LEFT);
 
@@ -3820,8 +4383,8 @@ public class FormEntryActivity extends CommonActivity implements
             if (!is1Screen)
                 repeatName = StringFormatUtils.getLastRepeatGroupName(mFormController.getCaptionHierarchy());
         }
-        mPre.setVisibility(mFormController.getEvent() == FormEntryController.EVENT_BEGINNING_OF_FORM || !PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_NAVIGATION_UP_DOWN_LEFT_RIGHT_BUTTONS, false) ? View.GONE : View.VISIBLE);
-        mNext.setVisibility(mFormController.getEvent() == FormEntryController.EVENT_END_OF_FORM || !PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_NAVIGATION_UP_DOWN_LEFT_RIGHT_BUTTONS, false) ? View.GONE : View.VISIBLE);
+        mPre.setVisibility(mFormController.isHaveFirstOrLastScreen(true) || mFormController.getEvent() == FormEntryController.EVENT_BEGINNING_OF_FORM || !PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_NAVIGATION_UP_DOWN_LEFT_RIGHT_BUTTONS, false) ? View.GONE : View.VISIBLE);
+        mNext.setVisibility(mFormController.isHaveFirstOrLastScreen(false) || mFormController.getEvent() == FormEntryController.EVENT_END_OF_FORM || !PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_NAVIGATION_UP_DOWN_LEFT_RIGHT_BUTTONS, false) ? View.GONE : View.VISIBLE);
 
         if (mFormController.getEvent() != FormEntryController.EVENT_END_OF_FORM && mFormController.getEvent() != FormEntryController.EVENT_BEGINNING_OF_FORM) {
             if (mFormController.currentPromptIsQuestion()) {
@@ -3838,10 +4401,10 @@ public class FormEntryActivity extends CommonActivity implements
                     currentRepeatName = currentRepeatName.trim();
 
                     //check if still in repeat group or not
-                    for (int i = 0; i < questionNames.length; i++) {
-                        String tmp = questionNames[i];
+                    for (String name : questionNames) {
+                        String tmp = name;
                         if (tmp.length() > 0 && tmp.contains("["))
-                            tmp = tmp.substring(0, questionNames[i].indexOf("["));
+                            tmp = tmp.substring(0, name.indexOf("["));
                         if (tmp.equals(currentRepeatName)) {
                             moveOutFromRepeat = false;
                             break;
@@ -3899,54 +4462,49 @@ public class FormEntryActivity extends CommonActivity implements
         }*/
     }
 
-    // Hopefully someday we can use managed dialogs when the bugs are fixed
-    /*
-     * Ideally, we'd like to use Android to manage dialogs with onCreateDialog()
-	 * and onPrepareDialog(), but dialogs with dynamic content are broken in 1.5
-	 * (cupcake). We do use managed dialogs for our static loading
-	 * ProgressDialog. The main issue we noticed and are waiting to see fixed
-	 * is: onPrepareDialog() is not called after a screen orientation change.
-	 * http://code.google.com/p/android/issues/detail?id=1639
-	 */
-
-    //
-
     /**
      * Creates and displays a dialog displaying the violated constraint.
      */
-    private void createConstraintToast(FormIndex index, int saveStatus) {
+    public void createConstraintToast(FormIndex index, int saveStatus) {
         String constraintText;
         boolean shouldShowToast = true;
-        switch (saveStatus) {
-            case FormEntryController.ANSWER_CONSTRAINT_VIOLATED:
-                constraintText = mFormController
-                        .getQuestionPromptConstraintText(index);
-                ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.ANSWER_CONSTRAINT_VIOLATED, constraintText);
+        String appearance = mFormController.getQuestionPromptApearance(index) + "";
+        if (appearance.contains("confirm_read")) {
+            FailedConstraint a = new FailedConstraint(index, saveStatus);
+            createContraintDialog(a);
 
-                if (constraintText == null) {
-                    constraintText = getString(R.string.invalid_answer_error);
-                } else {
-                    shouldShowToast = constraintText.contains(PREFIX_SHOW_DIALOG) ? false : true;
-                }
-                break;
-            case FormEntryController.ANSWER_REQUIRED_BUT_EMPTY:
-                constraintText = mFormController
-                        .getQuestionPromptRequiredText(index);
-                ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.ANSWER_REQUIRED_BUT_EMPTY, constraintText);
+        } else if (!appearance.contains("confirm_read")) {
+            switch (saveStatus) {
+                case FormEntryController.ANSWER_CONSTRAINT_VIOLATED:
+                    constraintText = mFormController
+                            .getQuestionPromptConstraintText(index);
+                    ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.ANSWER_CONSTRAINT_VIOLATED, constraintText);
 
-                if (constraintText == null) {
-                    constraintText = getString(R.string.required_answer_error);
-                } else {
-                    shouldShowToast = constraintText.contains(PREFIX_SHOW_DIALOG) ? false : true;
-                }
-                break;
-            default:
-                return;
+                    if (constraintText == null) {
+                        constraintText = getString(R.string.invalid_answer_error);
+                    } else {
+                        shouldShowToast = constraintText.contains(PREFIX_SHOW_DIALOG) ? false : true;
+                    }
+                    break;
+                case FormEntryController.ANSWER_REQUIRED_BUT_EMPTY:
+                    constraintText = mFormController
+                            .getQuestionPromptRequiredText(index);
+                    ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.ANSWER_REQUIRED_BUT_EMPTY, constraintText);
+
+                    if (constraintText == null) {
+                        constraintText = getString(R.string.required_answer_error);
+                    } else {
+                        shouldShowToast = constraintText.contains(PREFIX_SHOW_DIALOG) ? false : true;
+                    }
+                    break;
+                default:
+                    return;
+            }
+            if (shouldShowToast) {
+                showCustomToast(constraintText, Toast.LENGTH_LONG);
+            } else
+                showCustomDialog(constraintText);
         }
-        if (shouldShowToast) {
-            //showCustomToast(constraintText, Toast.LENGTH_SHORT);
-        } else
-            showCustomDialog(constraintText);
     }
 
     public void resetQuestion() {
@@ -3956,35 +4514,134 @@ public class FormEntryActivity extends CommonActivity implements
             for (int i = 0; i < qt.size(); i++) {
                 qt.get(i).setRefesh();
             }
-        }
-        else {
+        } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
     }
 
-    private void createConstraint(FormIndex index, int saveStatus) {
+    public void createConstraint(FormIndex index, int saveStatus) {
+
         List<QuestionWidget> qt = ((RTAView) mCurrentView).getWidgets();
         boolean isShowRequiredAsterisk = PreferencesManager.getPreferencesManager(this).getBoolean(_PreferencesActivity.KEY_SHOW_REQUIRED_ASTERISK, false);
         for (final QuestionWidget q : qt) {
             if (q.getIndex() == index) {
+                if (q.getAppearance() != null) {
+                    if (q.getAppearance().contains("confirm_read")) {
+                        FailedConstraint failedConstraint = new FailedConstraint(index, saveStatus);
+                        listConfirmRead.add(failedConstraint);
+                    }
+                }
                 String violatedText = null;
                 switch (saveStatus) {
                     case FormEntryController.ANSWER_CONSTRAINT_VIOLATED:
                         violatedText = mFormController.getQuestionPromptConstraintText(index);
                         q.setRefreshQuestion(isShowRequiredAsterisk, violatedText, true);
+                        q.setShowingIconRequierOrContranint(true);
                         break;
                     case FormEntryController.ANSWER_REQUIRED_BUT_EMPTY:
                         violatedText = mFormController.getQuestionPromptRequiredText(index);
                         q.setRefreshQuestion(isShowRequiredAsterisk, violatedText, false);
+                        q.setShowingIconRequierOrContranint(true);
                         break;
                     default:
-                        violatedText = this.getResources().getString(R.string.invalid_answer_error);
+                        violatedText =  this.getResources().getString(R.string.invalid_answer_error);
                         break;
                 }
                 ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.ANSWER_CONSTRAINT_VIOLATED, violatedText == null ? "" : violatedText);
             }
         }
 
+    }
+
+    public void createContraintDialog(FailedConstraint constraint) {
+        String constraintMessage = "";
+        if (constraint.status == FormEntryController.ANSWER_CONSTRAINT_VIOLATED) {
+            constraintMessage = mFormController.getQuestionPromptConstraintText(constraint.getFormIndex()) + "";
+        } else if (constraint.status == FormEntryController.ANSWER_REQUIRED_BUT_EMPTY) {
+            constraintMessage = mFormController.getQuestionPromptRequiredText(constraint.getFormIndex()) + "";
+        }
+
+        ArrayList<String> listMessage = cutConstraint(constraintMessage);
+        String Messages = "";
+        String confirmMessage = " I have read and understand this message.";
+        if (listMessage != null && listMessage.size() > 0) {
+            constraintMessage = listMessage.get(0);
+            confirmMessage = listMessage.get(1);
+        }
+        final Dialog confirm_dialog = new Dialog(this);
+        DisplayMetrics displaymetrics = new DisplayMetrics();
+
+        this.getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
+        int width = (int) ((int) displaymetrics.widthPixels * 0.8);
+        confirm_dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        confirm_dialog.setCancelable(false);
+        confirm_dialog.setContentView(R.layout.confirm_require_dialog_new);
+        confirm_dialog.getWindow().setLayout(width, -1);
+        confirm_dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        TextView title = (TextView) confirm_dialog.findViewById(R.id.txt_title_confirm);
+        TextView txt_constranit = (TextView) confirm_dialog.findViewById(R.id.txt_constraint);
+        txt_constranit.setText(confirmMessage);
+        title.setText(constraintMessage);
+        CheckBox checkBox_confirm = (CheckBox) confirm_dialog.findViewById(R.id.cb_dialog_required);
+
+        ImageView icon_dialog = (ImageView) confirm_dialog.findViewById(R.id.ic_dialog_required);
+        if (constraint.status == FormEntryController.ANSWER_CONSTRAINT_VIOLATED) {
+            icon_dialog.setImageResource(R.drawable.ic_constraint_dialog);
+        } else if (constraint.status == FormEntryController.ANSWER_REQUIRED_BUT_EMPTY) {
+            icon_dialog.setImageResource(R.drawable.ic_requied_dialog);
+        }
+        final Button btnOk = (Button) confirm_dialog.findViewById(R.id.btOk);
+        btnOk.setEnabled(false);
+        checkBox_confirm.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    btnOk.setTextColor(getResources().getColor(R.color.colorPrimary));
+                    btnOk.setEnabled(true);
+                } else {
+                    btnOk.setEnabled(false);
+                    btnOk.setTextColor(getResources().getColor(R.color.gray_light));
+                }
+            }
+        });
+        btnOk.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirm_dialog.dismiss();
+                positionConfirmRead++;
+                if (positionConfirmRead >= listConfirmRead.size()) {
+                    positionConfirmRead = 0;
+                    return;
+                }
+                createContraintDialog(listConfirmRead.get(positionConfirmRead));
+
+            }
+        });
+        try {
+            confirm_dialog.getWindow().getAttributes().windowAnimations = R.style.PauseDialogAnimation;
+            confirm_dialog.show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private ArrayList<String> cutConstraint(String constraint) {
+        ArrayList<String> parameters = new ArrayList<>();
+        Pattern thumbnailPattern = Pattern.compile("message\\(([^()]*|\\([^()]*\\))*\\)");
+        Pattern thumbnailPattern1 = Pattern.compile("confirm\\(([^()]*|\\([^()]*\\))*\\)");
+        Matcher matcher = thumbnailPattern.matcher(constraint);
+        Matcher matcher1 = thumbnailPattern1.matcher(constraint);
+        if (matcher.find()) {
+            String message = matcher.group();
+            message = new String(message.substring(8, message.length() - 1));
+            parameters.add(message);
+        }
+        if (matcher1.find()) {
+            String confirm = matcher1.group();
+            confirm = new String(confirm.substring(8, confirm.length() - 1));
+            parameters.add(confirm);
+        }
+        return parameters;
     }
 
     private void showCustomDialog(String constraintText) {
@@ -4414,7 +5071,7 @@ public class FormEntryActivity extends CommonActivity implements
     /**
      * Creates and displays dialog with the given errorMsg.
      */
-    private void createErrorDialog(String errorMsg, final boolean shouldExit) {
+    public void createErrorDialog(String errorMsg, final boolean shouldExit) {
         ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_ERROR_DIALOG, "Shout exit: " + shouldExit);
 
         if (error_dialog != null && error_dialog.isShowing()) {
@@ -4502,11 +5159,10 @@ public class FormEntryActivity extends CommonActivity implements
         }
     }
 
-
     /**
      * Creates a confirm/cancel dialog for deleting repeats.
      */
-    private void createDeleteRepeatConfirmDialog(FormIndex formIndex) {
+    public void createDeleteRepeatConfirmDialog(FormIndex formIndex) {
         if (isViewOnly)
             return;
         ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_DELETE_REPEAT_DIALOG, "Show");
@@ -4634,6 +5290,7 @@ public class FormEntryActivity extends CommonActivity implements
             String lastUpdatedIndex = getLastUpdateIndex();
             mSaveToDiskTask = new SaveToDiskTask(getIntent().getData(), exit,
                     complete, updatedSaveName, statusSaveFinalize, keyAnswer, uuid_ssname, lastUpdatedIndex);
+            mSaveToDiskTask.setSkipValidate(skipValidate);
             mSaveToDiskTask.setFormSavedListener(this);
             mAutoSaved = true;
             if (!isNextInstance) {
@@ -4652,8 +5309,6 @@ public class FormEntryActivity extends CommonActivity implements
 
         return true;
     }
-
-    private boolean safeExitForm = false;
 
     /**
      * Create a dialog with options to save and exit, save, or quit without
@@ -4812,7 +5467,6 @@ public class FormEntryActivity extends CommonActivity implements
                     ProcessDbHelper.getInstance().removeProcess(mFormController.getSubmissionMetadata().instanceId);
                     exit_dialog.dismiss();
                     updateInstanceplushInfor();
-
                 } else { // discard changes and exit
                     exit_dialog.dismiss();
                     discardChangesAndExit();
@@ -4833,6 +5487,9 @@ public class FormEntryActivity extends CommonActivity implements
                 ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE,
                         Constants.SHOW_QUIT_DIALOG, Constants.BUTTON_CANCEL);
                 exit_dialog.dismiss();
+
+                //Make empty list media file to delete
+                RTASurvey.getInstance().clearListNameFileToDelete();
             }
         });
         try {
@@ -4897,15 +5554,21 @@ public class FormEntryActivity extends CommonActivity implements
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                btn_submit.setEnabled(true);
-                btn_submit.setBackground(getResources().getDrawable(R.drawable.btn_backgroud_private));
-                btn_submit.setTextColor(getResources().getColor(R.color.text_color_white));
+
 
             }
 
             @Override
             public void afterTextChanged(Editable s) {
-
+                if (et_input.getText().length() > 0) {
+                    btn_submit.setEnabled(true);
+                    btn_submit.setBackground(getResources().getDrawable(R.drawable.btn_backgroud_private));
+                    btn_submit.setTextColor(getResources().getColor(R.color.text_color_white));
+                } else {
+                    btn_submit.setEnabled(false);
+                    btn_submit.setBackground(getResources().getDrawable(R.drawable.btn_backgroud_white));
+                    btn_submit.setTextColor(getResources().getColor(R.color.text_color_grey));
+                }
             }
         });
         btn_cancel.setOnClickListener(new OnClickListener() {
@@ -4918,112 +5581,29 @@ public class FormEntryActivity extends CommonActivity implements
         btn_submit.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (et_input.length() == 0) {
-                    MessageUtils.showToastInfo(FormEntryActivity.this,
-                            R.string.request_return_instance_err_comment_empty);
-                    et_input.requestFocus();
-                } else if (Common.isConnect(FormEntryActivity.this)) {
+                if (Common.isConnect(FormEntryActivity.this)) {
                     Common.hideKeyboard(FormEntryActivity.this, et_input);
                     String comment = et_input.getText().toString();
                     screenRequestDialog.cancel();
                     startRequestReturnTask(uuid, name, formId, version, comment, type);
-                } else if (RTASurvey.getInstance().isKeyAutoApproveRequestEdit()
-                        && type.equals(ConnectionService.RequestReturn.TYPE_FINALIZED)) {
-                    Common.hideKeyboard(FormEntryActivity.this, et_input);
-                    String comment = et_input.getText().toString();
-                    screenRequestDialog.cancel();
-                    SurveyCollectorUtils.forceIncomplete(getApplicationContext(), uuid);
-                    MessageUtils.showToastInfo(getApplicationContext(),
-                            getString(R.string.request_return_instance_successful_local, name));
-                    saveOfflineRequest(uuid, name, formId, version, comment, type);
-                    finishReturnInstance(false);
-                } else {
+                } else if (!Common.isConnect(FormEntryActivity.this)) {
                     MessageUtils.showNetworkInfo(FormEntryActivity.this);
+                } else if (ConnectionService.RequestReturn.TYPE_FINALIZED.equals(type)) {
+                    UserInfo u = Common.getUserInfo(getApplicationContext());
+                    if (u != null && "1".equals(u.getAuto_approve_edit_request())) {
+                        Common.hideKeyboard(FormEntryActivity.this, et_input);
+                        String comment = et_input.getText().toString();
+                        screenRequestDialog.cancel();
+                        SurveyCollectorUtils.forceIncomplete(getApplicationContext(), uuid);
+                        MessageUtils.showToastInfo(getApplicationContext(),
+                                getString(R.string.request_return_instance_successful_local, name));
+                        saveOfflineRequest(uuid, name, formId, version, comment, type);
+                        finishReturnInstance(false);
+                    }
                 }
             }
 
         });
-
-//        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-//
-//        final View view = getLayoutInflater().inflate(R.layout.dialog_request_edit_instance, null);
-//        requestWindowFeature(Window.FEATURE_NO_TITLE);
-//        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-//        getWindow().setBackgroundDrawable(getResources().getDrawable(R.drawable.transparent));
-//        final EditText input = (EditText) view.findViewById(R.id.request_comment);
-//        builder.setView(view);
-//        builder.setPositiveButton(R.string.btn_ok,
-//                new DialogInterface.OnClickListener() {
-//                    public void onClick(DialogInterface dialog, int id) {
-//                    }
-//                });
-//        builder.setNegativeButton(R.string.btn_cancel,
-//                new DialogInterface.OnClickListener() {
-//                    public void onClick(DialogInterface dialog, int id) {
-//                    }
-//                });
-//        final AlertDialog commentDialog = builder.create();
-//
-//        commentDialog.setOnShowListener(new DialogInterface.OnShowListener() {
-//            @Override
-//            public void onShow(final DialogInterface dialog) {
-//                Button btnCancel = commentDialog.getButton(DialogInterface.BUTTON_NEGATIVE);
-//                Button btnOk = commentDialog.getButton(DialogInterface.BUTTON_POSITIVE);
-//                btnCancel.setOnClickListener(new View.OnClickListener() {
-//                    @Override
-//                    public void onClick(View v) {
-//                        Common.hideKeyboard(FormEntryActivity.this, input);
-//                        dialog.cancel();
-//                    }
-//                });
-//                btnOk.setOnClickListener(new View.OnClickListener() {
-//                    @Override
-//                    public void onClick(View v) {
-//                        if (input.length() == 0) {
-//                            MessageUtils.showToastInfo(FormEntryActivity.this,
-//                                    R.string.request_return_instance_err_comment_empty);
-//                            input.requestFocus();
-//                        } else if (Common.isConnect(FormEntryActivity.this)) {
-//                            Common.hideKeyboard(FormEntryActivity.this, input);
-//                            String comment = input.getText().toString();
-//                            dialog.cancel();
-//                            startRequestReturnTask(uuid, name, formId, version, comment, type);
-//                        } else if (RTASurvey.getInstance().isKeyAutoApproveRequestEdit()
-//                                && type.equals(ConnectionService.RequestReturn.TYPE_FINALIZED)) {
-//                            Common.hideKeyboard(FormEntryActivity.this, input);
-//                            String comment = input.getText().toString();
-//                            dialog.cancel();
-//                            SurveyCollectorUtils.forceIncomplete(getApplicationContext(), uuid);
-//                            MessageUtils.showToastInfo(getApplicationContext(),
-//                                    getString(R.string.request_return_instance_successful_local, name));
-//                            saveOfflineRequest(uuid, name, formId, version, comment, type);
-//                            finishReturnInstance(false);
-//                        } else {
-//                            MessageUtils.showNetworkInfo(FormEntryActivity.this);
-//                        }
-//                    }
-//                });
-//            }
-//
-//            void saveOfflineRequest(String uuid, String name, String formId, String version,
-//                                    String comment, String type) {
-//                try {
-//                    String host = RTASurvey.getInstance().getServerUrl();
-//                    String key = RTASurvey.getInstance().getServerKey();
-//                    String username = RTASurvey.getInstance().getCredential(RTASurvey.KEY_CREDENTIAL_USERNAME);
-//                    String serviceUrl = host + ConnectionService.SERVICE_REQUEST_RETURN_INSTANCE;
-//                    ConnectionService.RequestReturn obj = new ConnectionService.RequestReturn(username,
-//                            name, uuid, formId, version, comment, type, "1", System.currentTimeMillis());
-//                    String data = StringUtil.object2JSON(obj);
-//                    data = SimpleCrypto.encrypt(key, data);
-//                    FailedReportManager.getInstance().saveReport(host, serviceUrl, data, false);
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        });
-//
-//        commentDialog.show();
     }
 
     void saveOfflineRequest(String uuid, String name, String formId, String version,
@@ -5251,57 +5831,6 @@ public class FormEntryActivity extends CommonActivity implements
                 }
             }
         }
-//        LayoutInflater inflater = (this).getLayoutInflater();
-//        View view = inflater.inflate(R.layout.dialog_changes_language,null,false);
-//        LinearLayout a = (LinearLayout) view.findViewById(R.id.layoutChanges);
-//        AlertDialog.Builder mAlertDialog = new AlertDialog.Builder(this)
-//                .setSingleChoiceItems(languages, selected,
-//                new DialogInterface.OnClickListener() {
-//                    @Override
-//                    public void onClick(DialogInterface dialog,
-//                                        int whichButton) {
-//                        // Update the language in the content provider
-//                        // when selecting a new
-//                        // language
-//                        ContentValues values = new ContentValues();
-//                        values.put(FormsColumns.LANGUAGE,
-//                                languages[whichButton]);
-//                        String selection = FormsColumns.FORM_FILE_PATH
-//                                + "=?";
-//                        String selectArgs[] = {mFormPath};
-//                        int updated = getContentResolver().update(
-//                                FormsColumns.CONTENT_URI, values,
-//                                selection, selectArgs);
-//
-//                        ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_LANGUAGE_DIALOG, "changeLanguage."
-//                                + languages[whichButton]);
-//                        mFormController
-//                                .setLanguage(languages[whichButton]);
-//                        dialog.dismiss();
-//                        if (mFormController.currentPromptIsQuestion()) {
-//                            saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
-//                        }
-//
-//                        currentQaCheckPoint = null;
-//                        currentCommand = "";
-//                        waitingCheckpoint = false;
-//                        refreshCurrentView();
-//                    }
-//                });
-//        mAlertDialog.setNegativeButton(getString(R.string.do_not_change),
-//                new DialogInterface.OnClickListener() {
-//                    @Override
-//                    public void onClick(DialogInterface dialog,
-//                                        int whichButton) {
-//                        ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.SHOW_LANGUAGE_DIALOG, "cancel");
-//                    }
-//                });
-//
-//        AlertDialog aaaa = mAlertDialog.create();
-//        aaaa.requestWindowFeature(Window.FEATURE_NO_TITLE);
-//        aaaa.setCancelable(false);
-//        aaaa.setContentView(R.layout.dialog_changes_language);
-//        aaaa.show();
         changes_language = new Dialog(this);
         DisplayMetrics displaymetrics = new DisplayMetrics();
         this.getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
@@ -5374,8 +5903,6 @@ public class FormEntryActivity extends CommonActivity implements
         switch (id) {
             case PROGRESS_DIALOG:
                 ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.CREATE_PROGRESS_DIALOG, "show");
-
-//                mProgressDialog = new ProgressDialog(this);
                 loading_dialog = new Dialog(this);
                 DisplayMetrics displaymetrics = new DisplayMetrics();
                 this.getWindowManager().getDefaultDisplay().getMetrics(displaymetrics);
@@ -5391,37 +5918,9 @@ public class FormEntryActivity extends CommonActivity implements
                 textMessage.setText(getString(R.string.please_wait));
                 ProgressBar proLoading = (ProgressBar) loading_dialog.findViewById(R.id.pro_loading);
                 proLoading.setIndeterminate(true);
-                DialogInterface.OnClickListener loadingButtonListener = new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.CREATE_PROGRESS_DIALOG, Constants.BUTTON_CANCEL);
-
-                        dialog.dismiss();
-                        mFormLoaderTask.setFormLoaderListener(null);
-                        if (mReFormLoaderTask != null) {
-                            mReFormLoaderTask.setFormLoaderListener(null);
-                            mReFormLoaderTask.cancel(true);
-                            mReFormLoaderTask.destroy();
-                            mFormLoaderTask = null;
-                        }
-                        FormLoaderTask t = mFormLoaderTask;
-                        mFormLoaderTask = null;
-                        t.cancel(true);
-                        t.destroy();
-                        // TODO luan vu modified
-                        removePendingInstance();
-                        //finish();
-                    }
-                };
-//                mProgressDialog.setIcon(android.R.drawable.ic_dialog_info);
-//                mProgressDialog.setTitle(getString(R.string.loading_form));
-//                mProgressDialog.setMessage(getString(R.string.please_wait));
-//                mProgressDialog.setIndeterminate(true);
-//                mProgressDialog.setCancelable(false);
                 return loading_dialog;
             case SAVING_DIALOG:
                 ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.CREATE_PROGRESS_DIALOG, "SAVING_DIALOG");
-//                mProgressDialog = new ProgressDialog(this);
                 saving_dialog = new Dialog(this);
                 DisplayMetrics displaymetrics1 = new DisplayMetrics();
                 this.getWindowManager().getDefaultDisplay().getMetrics(displaymetrics1);
@@ -5437,20 +5936,6 @@ public class FormEntryActivity extends CommonActivity implements
                 textMessage1.setText(getString(R.string.please_wait));
                 ProgressBar proLoading1 = (ProgressBar) saving_dialog.findViewById(R.id.pro_loading);
                 proLoading1.setIndeterminate(true);
-                DialogInterface.OnClickListener cancelSavingButtonListener = new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.CREATE_PROGRESS_DIALOG, Constants.BUTTON_CANCEL);
-
-                        dialog.dismiss();
-                        cancelSaveToDiskTask();
-                    }
-                };
-//                mProgressDialog.setIcon(android.R.drawable.ic_dialog_info);
-//                mProgressDialog.setTitle(getString(R.string.saving_form));
-//                mProgressDialog.setMessage(getString(R.string.please_wait));
-//                mProgressDialog.setIndeterminate(true);
-//                mProgressDialog.setCancelable(false);
                 saving_dialog
                         .setOnDismissListener(new DialogInterface.OnDismissListener() {
                             @Override
@@ -5468,8 +5953,6 @@ public class FormEntryActivity extends CommonActivity implements
                 mProgressDialog.setMessage(getString(R.string.please_wait));
                 mProgressDialog.setIndeterminate(true);
                 mProgressDialog.setCancelable(false);
-                /*mProgressDialog.setButton(getString(R.string.cancel_loading_form),
-                        loadingButtonListener);*/
                 return mProgressDialog;
 
         }
@@ -5478,20 +5961,21 @@ public class FormEntryActivity extends CommonActivity implements
 
     private void cancelSaveToDiskTask() {
         synchronized (saveDialogLock) {
-            try {
-                mSaveToDiskTask.setFormSavedListener(null);
-                boolean cancelled = mSaveToDiskTask.cancel(true);
-                Log.w(t, "Cancelled SaveToDiskTask! (" + cancelled + ")");
-                mSaveToDiskTask = null;
+            if (mSaveToDiskTask != null) {
+                try {
+                    mSaveToDiskTask.setFormSavedListener(null);
+                    boolean cancelled = mSaveToDiskTask.cancel(true);
+                    Timber.w("Cancelled SaveToDiskTask! (%s)", cancelled);
+                    mSaveToDiskTask = null;
 
-                if (mExportToCsvTask != null) {
-                    boolean c = mExportToCsvTask.cancel(true);
-                    mExportToCsvTask = null;
+                    if (mExportToCsvTask != null) {
+                        boolean c = mExportToCsvTask.cancel(true);
+                        mExportToCsvTask = null;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
-
         }
     }
 
@@ -5533,8 +6017,7 @@ public class FormEntryActivity extends CommonActivity implements
                         ((QACheckPointWidget) q).getDialogProcessQAchecking().dismiss();
                 }
             }
-        }
-        else {
+        } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
 
@@ -5583,18 +6066,11 @@ public class FormEntryActivity extends CommonActivity implements
             if (v != null) {
                 v.clearFocus();
             }
-        }
-        else {
+        } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
-        /*
-        cleanConfigs(new Intent(this, InIpCallService.class));
-        cleanConfigs(new Intent(this, SipService.class));
-        */
         Log.d("FORM_ENTRY", "onPause() - end");
     }
-
-    public boolean isLoading = false;
 
     @Override
     protected void onResume() {
@@ -5661,20 +6137,7 @@ public class FormEntryActivity extends CommonActivity implements
             mSaveToDiskTask.setFormSavedListener(this);
         }
 
-        // only check the buttons if it's enabled in preferences
-        Boolean showButtons = PreferencesManager.getPreferencesManager(this)
-                .getBoolean(_PreferencesActivity.KEY_NAVIGATION_BUTTONS, false);
-        if (showButtons) {
-            mBackButton.setVisibility(View.VISIBLE);
-            mNextButton.setVisibility(View.VISIBLE);
-        } else {
-            mBackButton.setVisibility(View.GONE);
-            mNextButton.setVisibility(View.GONE);
-        }
-
         if (!isLoading) {
-            //if (intent != null) {
-            //Uri uri = intent.getData();
             if (mFormController != null) {
                 String instanceFilePath = mFormController.getInstancePath().getAbsolutePath();
                 String qaPath = mFormController.getQaFolder().getAbsolutePath();
@@ -5691,15 +6154,69 @@ public class FormEntryActivity extends CommonActivity implements
 
             ScreenUtils.enterFullscreen();
         }
+
+        if (LinphoneService.isReady()) {
+            final View miniView = LinphoneService.instance().getIncallMiniView();
+
+            if (miniView != null) {
+                if (miniView.isShown()) {
+                    FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) content.getLayoutParams();
+                    params.setMargins(0, miniView.getHeight(), 0, 0);
+                    content.setLayoutParams(params);
+
+                    updateUIListener = new OnUpdateUIListener() {
+                        @Override
+                        public void updateUIByServiceStatus(boolean serviceConnected) {
+
+                        }
+
+                        @Override
+                        public void registrationState(boolean isConnected, String statusMessage) {
+
+                        }
+
+                        @Override
+                        public void updateToCallWidget(boolean isCalled) {
+
+                        }
+
+                        @Override
+                        public void launchIncomingCallActivity() {
+
+                        }
+
+                        @Override
+                        public void dismissCallActivity() {
+                            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) content.getLayoutParams();
+                            params.setMargins(0, 0, 0, 0);
+                            content.setLayoutParams(params);
+                        }
+                    };
+
+                    LinphoneService.addOnUpdateUIListener(updateUIListener);
+                }
+            }
+        }
+    }
+
+    private void stopPlayback() {
+        if (mProgressRefresher != null) {
+            mProgressRefresher.removeCallbacksAndMessages(null);
+        }
+        if (mPlayer != null) {
+            mPlayer.release();
+            mPlayer = null;
+            mAudioManager.abandonAudioFocus(mAudioFocusListener);
+        }
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK:
+                stopPlayback();
                 if (RTAInputManager.getInstance().hideRTAKeyboard())
                     return true;
-
                 ActivityLogManager.InsertActionWithContext(Constants.ENTER_DATA_INSTANCE, Constants.BUTTON_BACK, "");
                 createQuitDialog();
                 return true;
@@ -5719,12 +6236,39 @@ public class FormEntryActivity extends CommonActivity implements
                     return true;
                 }
                 break;
+            case KeyEvent.KEYCODE_HEADSETHOOK:
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                if (mPlayer.isPlaying()) {
+                    mPlayer.pause();
+                } else {
+                    start();
+                }
+                updatePlayPause();
+                return true;
+            case KeyEvent.KEYCODE_MEDIA_PLAY:
+                start();
+                updatePlayPause();
+                return true;
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:
+                if (mPlayer.isPlaying()) {
+                    mPlayer.pause();
+                }
+                updatePlayPause();
+                return true;
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+            case KeyEvent.KEYCODE_MEDIA_NEXT:
+            case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+                return true;
+            case KeyEvent.KEYCODE_MEDIA_STOP:
+
         }
         return super.onKeyDown(keyCode, event);
     }
 
     @Override
     protected void onDestroy() {
+        stopPlayback();
         if (mReceiver != null) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(mReceiver);
         }
@@ -5774,7 +6318,8 @@ public class FormEntryActivity extends CommonActivity implements
     }
 
     private void cleanConfigs() {
-        IPCallManager.getInstance().cleanConfigs(this);
+        if (IPCallManager.isInstantiated())
+            IPCallManager.getInstance().cleanConfigs(this);
         if (TraceLocationService.isRunning()) {
             stopService(new Intent(this, TraceLocationService.class));
         }
@@ -5807,11 +6352,6 @@ public class FormEntryActivity extends CommonActivity implements
         }
     }
 
-    private int mAnimationCompletionSet = 0;
-    private ProgressDialog dialogProcessQAchecking;
-    private boolean isBreakThreadQA = false;
-    int progressWaitChecking;
-
     private void afterAllAnimations() {
         if (mStaleView != null) {
             if (mStaleView instanceof RTAView) {
@@ -5822,8 +6362,7 @@ public class FormEntryActivity extends CommonActivity implements
 
         if (mCurrentView instanceof RTAView) {
             ((RTAView) mCurrentView).setFocus(this);
-        }
-        else {
+        } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
         mBeenSwiped = false;
@@ -6356,6 +6895,10 @@ public class FormEntryActivity extends CommonActivity implements
             return mFormController.getXPath(index);
     }
 
+    public FormController getFormController() {
+        return mFormController;
+    }
+
     public String getSSName() {
         return mFormController != null ? mFormController.getSSName() : null;
     }
@@ -6709,7 +7252,6 @@ public class FormEntryActivity extends CommonActivity implements
 
         String errorNewForm = null;
 
-        //// TODO: 13/12/2016
         if (!isViewOnly)
             if (isNextInstance) {
                 Cursor cForm = null;
@@ -6811,8 +7353,7 @@ public class FormEntryActivity extends CommonActivity implements
                         velocityX, velocityY)) {
                     return false;
                 }
-            }
-            else {
+            } else {
                 Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
             }
 
@@ -6872,7 +7413,6 @@ public class FormEntryActivity extends CommonActivity implements
 
     }
 
-
     /**
      * Finds the angle between two points in the plane (x1,y1) and (x2, y2)
      * The angle is measured with 0/360 being the X-axis to the right, angles
@@ -6902,7 +7442,7 @@ public class FormEntryActivity extends CommonActivity implements
 //        }
 
         if (e1.getRawY() - e2.getRawY() > 20) {
-            if (e1.getRawY() >= (screenHeight - 20)) {
+            if (e1.getRawY() >= (screenHeight - getNavigationBarHeight())) {
                 //Check to determine whether it scrolled from bottom of the screen
                 if (isImmersiveFullscreen) {
                     //Now it certainly is in immersive fullscreen -> escape fullscreen
@@ -6964,11 +7504,6 @@ public class FormEntryActivity extends CommonActivity implements
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
-    }
-
-    @Override
     protected void onStop() {
         /*
         if (SipCallManager.getInstance().isRunning())
@@ -7024,6 +7559,11 @@ public class FormEntryActivity extends CommonActivity implements
         if (!isSaveConfig) {
             SurveyCollectorUtils.cleanLatestInstanceConfig();
         }
+
+        if (LinphoneService.isReady() && updateUIListener != null) {
+            LinphoneService.removeOnUpdateUIListener(updateUIListener);
+        }
+
         super.onStop();
     }
 
@@ -7163,18 +7703,6 @@ public class FormEntryActivity extends CommonActivity implements
         this.isComfrimAudioRecore = isComfrimAudioRecore;
     }
 
-    public static boolean isSendingWorking() {
-        return isSendingWorking;
-    }
-
-    public static void setIsSendingWorking(boolean isSendingWorking) {
-        FormEntryActivity.isSendingWorking = isSendingWorking;
-    }
-
-    public static void setIsChangeDataEdit(boolean isChangeDataEdit) {
-    }
-
-
     //capture screen shot and show popup
     public Bitmap takeScreenshot() {
         ActivityLogManager.InsertChangeScreenLog(Constants.ENTER_DATA_INSTANCE, Constants.TASK_TAKE_SCREEN_SHOT);
@@ -7203,7 +7731,10 @@ public class FormEntryActivity extends CommonActivity implements
         cleanConfigs();
         isNextInstance = isNew;
         isSentInstance = isSent;
-        formFamilyNext = formFamily;
+        if (formFamily != null) {
+            formFamilyNext = formFamily.equals(".") ? getFormController().getFormFamilyID() : formFamily;
+        }
+
         enableCurrentView(false);
 
         //call action save
@@ -7418,8 +7949,7 @@ public class FormEntryActivity extends CommonActivity implements
     private void enableCurrentView(boolean isEnable) {
         if (mCurrentView instanceof RTAView) {
             ((RTAView) mCurrentView).setEnabled(isEnable);
-        }
-        else {
+        } else {
             Log.e(FormEntryActivity.class.getName(), "mCurrentView is not instance of RTAView");
         }
     }
@@ -7457,40 +7987,21 @@ public class FormEntryActivity extends CommonActivity implements
     @Override
     public void onSaverCurrentAnswerForCall() {
         saveAnswersForCurrentScreen(false);
-        RFormEntryPrompt[] prompts = mFormController.getQuestionPrompts();
-        FormEntryPrompt[] formEntry = new FormEntryPrompt[prompts.length];
-
-        if (prompts != null)
-            for (int i = 0; i < prompts.length; i++) {
-                formEntry[i] = prompts[i].getFormEntryPrompt();
-            }
-
-        if (formEntry != null)
-            ((RTAView) mCurrentView).refreshAllView(formEntry);
-
+        updateLabelAndResetXpath();
     }
 
     public void updateLabelAndResetXpath() {
         RFormEntryPrompt[] prompts = mFormController.getQuestionPrompts();
-        FormEntryPrompt[] formEntry = new FormEntryPrompt[prompts.length];
-
-        if (prompts != null)
-            for (int i = 0; i < prompts.length; i++) {
-                formEntry[i] = prompts[i].getFormEntryPrompt();
-            }
-
-        if (formEntry != null) {
-            ((RTAView) mCurrentView).refreshAllView(formEntry);
-        }
+        ((RTAView) mCurrentView).refreshAllView(prompts);
     }
 
     @Override
-    public void createRepeatRecord() {
+    public void createRepeatRecord(boolean refreshScreen) {
         RFormEntryPrompt[] prompts = mFormController.getQuestionPrompts();
         for (RFormEntryPrompt p : prompts) {
             if (p.getAppearance() != null && p.getAppearance().contains("addable")) {
                 mFormController.increaseOrDecreaseRepeatCount(p.getFormIndex(), true);
-                if (mFormController.getrepeatCount(mFormController.getModel().getForm().getChild(p.getFormIndex()), p.getFormIndex()) == 1)
+                if (mFormController.getRepeatCount(mFormController.getModel().getForm().getChild(p.getFormIndex()), p.getFormIndex()) == 1)
                     refreshCurrentView();
                 currentIsRepeat = true;
                 //check repeat in here.
@@ -7509,12 +8020,13 @@ public class FormEntryActivity extends CommonActivity implements
                 break;
             }
         }
-        try {
-            refreshRepeatCurrentView();
-        } catch (RuntimeException e) {
-            e.printStackTrace();
-            createErrorDialog(e.getMessage(), DO_NOT_EXIT);
-        }
+        if (refreshScreen)
+            try {
+                refreshRepeatCurrentView();
+            } catch (RuntimeException e) {
+                e.printStackTrace();
+                createErrorDialog(e.getMessage(), DO_NOT_EXIT);
+            }
 
     }
 
@@ -7525,7 +8037,6 @@ public class FormEntryActivity extends CommonActivity implements
             currentRepeatName = repeatName.substring(0, repeatName.indexOf("["));
         else currentRepeatName = repeatName;
     }
-
 
     @Override
     public void refreshComplete
@@ -7550,7 +8061,6 @@ public class FormEntryActivity extends CommonActivity implements
         //saveAnswersForCurrentScreen(false);
     }
 
-
     @Override
     public void refreshScreen() {
         FormController formController = RTASurvey.getInstance().getFormController();
@@ -7562,12 +8072,7 @@ public class FormEntryActivity extends CommonActivity implements
             e.printStackTrace();
             createErrorDialog(e.getMessage(), DO_NOT_EXIT);
         }
-        return;
     }
-
-
-    public static final int PERMISSIONS_REQUEST = 1;
-    private PermissionRequestListener listener;
 
     public void setPermissionRequestListener(PermissionRequestListener listener) {
         this.listener = listener;
@@ -7591,39 +8096,6 @@ public class FormEntryActivity extends CommonActivity implements
                     listener.onPermissionDenied();
                 }
             }
-        }
-    }
-
-    public static void openFormEntry(Context context, long formId,
-                                     Bundle preloadBundle, String keyQuestion) {
-        Uri formUri = ContentUris.withAppendedId(FormsColumns.CONTENT_URI, formId);
-        Intent fillForm = new Intent(Intent.ACTION_EDIT, formUri);
-        if (preloadBundle != null) {
-            fillForm.putExtras(preloadBundle);
-        }
-        FormEntryActivity.keyQuestion = keyQuestion;
-        context.startActivity(fillForm);
-    }
-
-    public static void openFormEntry(Context context, String jrFormId, String jrVersion,
-                                     Bundle preloadBundle, String keyQuestion) {
-        Cursor c = context.getContentResolver().query(FormsColumns.CONTENT_URI,
-                new String[]{FormsColumns._ID},
-                FormsColumns.JR_FORM_ID + "=? and " +
-                        FormsColumns.JR_VERSION + "=? and " +
-                        FormsColumns.AVAILABILITY_STATUS + "=?",
-                new String[]{jrFormId, jrVersion, FormsProviderAPI.STATUS_AVAILABLE}, null);
-        long id = -1;
-        if (c != null) {
-            if (c.moveToFirst()) {
-                id = c.getLong(0);
-            }
-            c.close();
-        }
-        if (id > -1) {
-            openFormEntry(context, id, preloadBundle, keyQuestion);
-        } else {
-            Log.e(t, "ERROR:: Cannot connect to Form's data provider");
         }
     }
 
@@ -7701,7 +8173,7 @@ public class FormEntryActivity extends CommonActivity implements
     }
 
     public RelativeLayout getContentLayout() {
-        return out;
+        return content;
     }
 
     //Refresh the screen and widgets after jump to a new screen
@@ -7723,7 +8195,6 @@ public class FormEntryActivity extends CommonActivity implements
         }
         refreshCurrentView();
     }
-
 
     //Toggle actionbar
     public void showSupportActionBar(boolean enable) {
@@ -7751,7 +8222,6 @@ public class FormEntryActivity extends CommonActivity implements
         return false;
     }
 
-
     public void notifyIDBadgeScanAnswer(Map<String, String> answers, Map<String, List<String>> questions) {
         if (mCurrentView instanceof RTAView) {
             RTAView rtaView = (RTAView) mCurrentView;
@@ -7769,12 +8239,137 @@ public class FormEntryActivity extends CommonActivity implements
         }
     }
 
+    public void notifyQRAPIScanAnswer(Map<String, String> answers, Map<String, HashMap<String, List<String>>> questions) {
+        if (mCurrentView instanceof RTAView) {
+            question = questions;
+            RTAView rtaView = (RTAView) mCurrentView;
+            ArrayList<QuestionWidget> widgets = rtaView.getWidgets();
+
+            for (Map.Entry<String, HashMap<String, List<String>>> entryAll : questions.entrySet()) {
+                String keyAll = entryAll.getKey();
+                HashMap<String, List<String>> arrayAll = entryAll.getValue();
+                if (keyAll.equals("output")) {
+                    for (Map.Entry<String, List<String>> entry : arrayAll.entrySet()) {
+                        String key = entry.getKey();
+                        List<String> array = entry.getValue();
+                        for (String qName : array) {
+                            String answer = answers.get(key);
+                            saveAnswerIDBadgeScan(qName, answer, widgets);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public void notifyActionAnswer(Map<String, HashMap<String, List<String>>> questions) {
+        if (mCurrentView instanceof RTAView) {
+            if (questions != null) {
+                RTAView rtaView = (RTAView) mCurrentView;
+                ArrayList<QuestionWidget> widgets = rtaView.getWidgets();
+                for (Map.Entry<String, HashMap<String, List<String>>> entryAll : questions.entrySet()) {
+                    String keyAll = entryAll.getKey();
+                    HashMap<String, List<String>> arrayAll = entryAll.getValue();
+                    if (keyAll.equals("action")) {
+                        for (Map.Entry<String, List<String>> entry : arrayAll.entrySet()) {
+                            String key = entry.getKey();
+                            List<String> array = entry.getValue();
+                            String answer = action_qrapi;
+                            for (String action : array) {
+                                if (action.equals("image")) {
+                                    saveAnswerActionQRAPI(key, answer, widgets);
+                                } else {
+                                    saveAnswerIDBadgeScan(key, answer, widgets);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+
+    public void notifyStringApiAnswer(String[] listQuestion,String answer) {
+        if (mCurrentView instanceof RTAView) {
+            if(listQuestion!=null){
+                RTAView rtaView = (RTAView) mCurrentView;
+                ArrayList<QuestionWidget> widgets = rtaView.getWidgets();
+                for (String question : listQuestion ) {
+                    saveAnswerIDBadgeScan(question.substring(1,question.length()-1),answer,widgets);
+                }
+            }
+
+        }
+    }
+
+    public void notifyStringApiActionAnswer(String question,String answer){
+        if (mCurrentView instanceof RTAView) {
+            if(question!=null){
+                RTAView rtaView = (RTAView) mCurrentView;
+                ArrayList<QuestionWidget> widgets = rtaView.getWidgets();
+                saveAnswerIDBadgeScan(question.substring(1,question.length()-1),answer,widgets);
+
+            }
+
+        }
+    }
+
     public void saveAnswerIDBadgeScan(String qName, String answer, ArrayList<QuestionWidget> widgets) {
         for (QuestionWidget widget : widgets) {
             if (mFormController.getQuestionName(widget.getIndex()).equals(qName)) {
                 widget.saveIDBadgeAnswer(answer);
             }
         }
+        saveAndReFreshCurrentView("", false, mFormController.getFormIndex());
+    }
+
+    public void saveAnswerActionQRAPI(String qName, String answer, ArrayList<QuestionWidget> widgets) {
+        for (QuestionWidget widget : widgets) {
+            if (mFormController.getQuestionName(widget.getIndex()).equals(qName)) {
+                if (countAction == 0) {
+                    File ifiLegacy = new File(answer);
+                    String miInstanceFolderLegacy = mFormController.getInstancePath().getParent();
+                    String isLegacy = miInstanceFolderLegacy + File.separator
+                            + System.currentTimeMillis();
+                    infLegacy = new File(isLegacy);
+                    if (!infLegacy.exists()) {
+                        Log.e(t, ifiLegacy.getAbsolutePath() + " this is not exists");
+                    }
+
+                    try {
+                        org.apache.commons.io.FileUtils.moveFile(ifiLegacy, infLegacy);
+                    } catch (IOException e) {
+                        Log.e(t, "Failed to move file to " + infLegacy.getAbsolutePath());
+                        e.printStackTrace();
+                        break;
+                    }
+                    widget.saveActionValue(infLegacy);
+                    countAction = 1;
+                } else {
+                    String miInstanceFolderLegacy = mFormController.getInstancePath().getParent();
+                    String isLegacy = miInstanceFolderLegacy + File.separator
+                            + System.currentTimeMillis();
+                    File infLegacy1 = new File(isLegacy);
+                    if (!infLegacy1.exists()) {
+                        Log.e(t, infLegacy.getAbsolutePath() + " this is not exists");
+                    }
+
+                    try {
+                        org.apache.commons.io.FileUtils.moveFile(infLegacy, infLegacy1);
+                    } catch (IOException e) {
+                        Log.e(t, "Failed to move file to " + infLegacy.getAbsolutePath());
+                        e.printStackTrace();
+                        break;
+                    }
+                    widget.saveActionValue(infLegacy1);
+                }
+
+
+            }
+
+        }
+        saveAnswersForCurrentScreen(DO_NOT_EVALUATE_CONSTRAINTS);
     }
 
     @Override
@@ -7809,6 +8404,57 @@ public class FormEntryActivity extends CommonActivity implements
                 e.printStackTrace();
                 bluetoothService.write(message.getBytes());
             }
+        }
+    }
+
+    enum AnimationType {
+        LEFT, RIGHT, FADE
+    }
+
+    /*
+     * Wrapper class to help with handing off the MediaPlayer to the next instance
+     * of the activity in case of orientation change, without losing any state.
+     */
+    private static class PreviewPlayer extends MediaPlayer implements MediaPlayer.OnPreparedListener {
+        FormEntryActivity mActivity;
+        boolean mIsPrepared = false;
+
+        public void setActivity(FormEntryActivity activity) {
+            mActivity = activity;
+            setOnPreparedListener(this);
+            setOnErrorListener(mActivity);
+            setOnCompletionListener(mActivity);
+        }
+
+        public void setDataSourceAndPrepare(Uri uri) throws IllegalArgumentException,
+                SecurityException, IllegalStateException, IOException {
+            setDataSource(mActivity, uri);
+            prepareAsync();
+        }
+
+        /* (non-Javadoc)
+         * @see android.media.MediaPlayer.OnPreparedListener#onPrepared(android.media.MediaPlayer)
+         */
+        @Override
+        public void onPrepared(MediaPlayer mp) {
+            mIsPrepared = true;
+            mActivity.onPrepared(mp);
+        }
+
+        boolean isPrepared() {
+            return mIsPrepared;
+        }
+    }
+
+    class ProgressRefresher implements Runnable {
+
+        public void run() {
+            if (mPlayer != null && !mSeeking && mDuration != 0) {
+                int progress = mPlayer.getCurrentPosition() / mDuration;
+                mSeekBar.setProgress(mPlayer.getCurrentPosition());
+            }
+            mProgressRefresher.removeCallbacksAndMessages(null);
+            mProgressRefresher.postDelayed(new ProgressRefresher(), 200);
         }
     }
 }

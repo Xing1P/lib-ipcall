@@ -14,10 +14,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.support.annotation.Nullable;
+import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.CollapsingToolbarLayout;
+import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.TabLayout;
 import android.support.v13.app.FragmentPagerAdapter;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.view.ViewPager;
+import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -70,12 +74,15 @@ import vn.rta.cpms.communication.ui.AvatarView;
 import vn.rta.cpms.communication.util.AvatarUriUtil;
 import vn.rta.cpms.fragments.dialog.SelectDialogFragment;
 import vn.rta.cpms.preference.AppSettingSharedPreferences;
+import vn.rta.cpms.services.model.IpCallAccount;
 import vn.rta.cpms.services.model.UserInfo;
 import vn.rta.cpms.tasks.SyncAndDeactivateTask;
+import vn.rta.cpms.ui.TabbedFragment;
 import vn.rta.cpms.utils.Common;
 import vn.rta.cpms.utils.MessageUtils;
 import vn.rta.cpms.utils.PhotoSelectionHandler;
 import vn.rta.cpms.utils.qrscanner.ZxingUtils;
+import vn.rta.ipcall.ui.IPCallActivity;
 import vn.rta.piwik.Contacts;
 import vn.rta.piwik.PiwikTrackerManager;
 import vn.rta.rtmessaging.RtMessaging;
@@ -94,7 +101,7 @@ import static vn.rta.cpms.communication.util.ResourceUtils.openResource;
  */
 @RuntimePermissions
 public class StaffInfoFragment extends Fragment
-        implements /*CommunicationLoginHelper.MatrixSessionListener, */OnClickListener,
+        implements TabbedFragment, OnClickListener,
         OnMenuItemClickListener, CredentialManager.CredentialManagerListener {
     public static final String ITEM_MENU = StaffInfoFragment.class.getSimpleName() + ".ITEM_MENU";
     public static final String ITEM_POSITION = StaffInfoFragment.class.getSimpleName() + ".ITEM_POSITION";
@@ -116,6 +123,7 @@ public class StaffInfoFragment extends Fragment
     private PopupMenu menu;
     private AvatarView mAvatarView;
 
+    private boolean isIPCallReady = false;
     //private ViewGroup mDataSyncing;
     private View mAvatarLoading;
     private PhotoHandler mPhotoHandler;
@@ -207,6 +215,9 @@ public class StaffInfoFragment extends Fragment
         txtIPCallInfo.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+                Intent intent = new Intent(getActivity(), IPCallActivity.class);
+                intent.putExtra(IPCallActivity.KEY_IPCALL_SERVICE_READY, isIPCallReady);
+                startActivity(intent);
             }
         });
 
@@ -277,6 +288,29 @@ public class StaffInfoFragment extends Fragment
         });
         staffInfo.setText(Common.getStaffInfo(getActivity(), R.string.staffInfo_format));
 
+        UserInfo userInfo = Common.getUserInfo(getActivity());
+        if (userInfo != null) {
+            IpCallAccount account = userInfo.getIpcall();
+            if (account == null
+                    || account.getUser() == null || account.getUser().isEmpty()
+                    || account.getPassword() == null || account.getPassword().isEmpty()) {
+                txtIPCallInfo.setVisibility(View.GONE);
+                LinphoneManager.setAllowIncomingCall(false);
+            } else {
+                if (account.getPSTNNumber() == null || account.getPSTNNumber().isEmpty())
+                    txtIPCallInfo.setText("Unknown number ext " + account.getUser());
+                else
+                    txtIPCallInfo.setText(account.getPSTNNumber() + " ext " + account.getUser());
+                txtIPCallInfo.setVisibility(View.VISIBLE);
+            }
+        }
+        if (LinphoneManager.isAllowIncomingCall()) {
+            txtIPCallInfo.setVisibility(View.VISIBLE);
+        }
+        else {
+            txtIPCallInfo.setVisibility(View.GONE);
+        }
+
         //Listen matrix startup complete
 //        RtMessaging.get().getCredentialManager().addListener(this);
 
@@ -284,16 +318,15 @@ public class StaffInfoFragment extends Fragment
     }
 
     public void setEnableIPCallStatus(boolean enabled) {
-        if (!LinphoneManager.isAllowIncomingCall()) {
-            txtIPCallInfo.setVisibility(View.GONE);
-            return;
-        }
-        if (enabled) {
-            txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip_enabled, 0, 0, 0);
-            txtIPCallInfo.setTextColor(Color.BLACK);
-        } else {
-            txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip, 0, 0, 0);
-            txtIPCallInfo.setTextColor(Color.parseColor("#9E9E9E"));
+        isIPCallReady = enabled;
+        if (txtIPCallInfo != null) {
+            if (isIPCallReady) {
+                txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip_enabled, 0, 0, 0);
+                txtIPCallInfo.setTextColor(Color.BLACK);
+            } else {
+                txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip, 0, 0, 0);
+                txtIPCallInfo.setTextColor(Color.parseColor("#9E9E9E"));
+            }
         }
     }
 
@@ -332,6 +365,18 @@ public class StaffInfoFragment extends Fragment
     public void onResume() {
         super.onResume();
         RtMessaging.get().getCredentialManager().addListener(this);
+        if (txtIPCallInfo != null) {
+            if (LinphoneService.isReady() && isIPCallReady) {
+                isIPCallReady = true;
+                txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip_enabled, 0, 0, 0);
+                txtIPCallInfo.setTextColor(Color.BLACK);
+            } else {
+                isIPCallReady = false;
+                txtIPCallInfo.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_phone_voip, 0, 0, 0);
+                txtIPCallInfo.setTextColor(Color.parseColor("#9E9E9E"));
+            }
+        }
+        startUpdateTask();
     }
 
     @Override
@@ -612,7 +657,7 @@ public class StaffInfoFragment extends Fragment
                     PiwikTrackerManager.newInstance().trackClickAction(StaffInfoFragment.class.getSimpleName(), 20, Contacts.STAFF_INFO, Contacts.ACTION_CHANGE_AVATAR);
                     resource.contentStream.close();
                 } catch (Exception e) {
-                    Log.e(TAG, "MediaStore.Images.Thumbnails.getThumbnail " + e.getMessage());
+                    Log.e(TAG, "MediaStore.Images.Thumbnails.getThumbnailBitmap " + e.getMessage());
                 }
                 persistAvatarToServer(session, scaledImageUri != null ? scaledImageUri : imageUri);
             }
@@ -691,6 +736,42 @@ public class StaffInfoFragment extends Fragment
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         StaffInfoFragmentPermissionsDispatcher.onRequestPermissionsResult(this, requestCode, grantResults);
+    }
+
+    @Override
+    public void onPageChanged(int page) {
+        if (page == 4) {
+            startUpdateTask();
+        } else {
+            stopAllTask();
+        }
+    }
+
+    @Override
+    public void onFabClick(View view) {
+
+    }
+
+    /**
+     * @param fab
+     */
+    @Override
+    public void setFabAppearance(FloatingActionButton fab) {
+        fab.hide();
+    }
+
+    /**
+     * Creates appbar's appearance of the tab when the tab selected
+     *
+     * @param appBarLayout
+     * @param collapsingToolbarLayout
+     * @param toolbar
+     * @param parallax
+     * @return false if this tab fragment want to be appeared default second appbar
+     */
+    @Override
+    public boolean onTabAppBarLayoutAppearance(AppBarLayout appBarLayout, CollapsingToolbarLayout collapsingToolbarLayout, Toolbar toolbar, ViewGroup parallax) {
+        return false;
     }
 
     private final class PhotoHandler extends PhotoSelectionHandler {

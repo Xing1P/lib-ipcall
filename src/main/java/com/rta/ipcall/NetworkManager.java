@@ -24,18 +24,21 @@ import android.content.Intent;
 import android.net.ConnectivityManager;
 
 
+
 /**
+ * 
  * Intercept network state changes and update linphone core through LinphoneManager.
+ *
  */
 public class NetworkManager extends BroadcastReceiver {
 
-    @Override
-    public void onReceive(Context context, Intent intent) {
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        Boolean lNoConnectivity = intent.getBooleanExtra(ConnectivityManager.EXTRA_NO_CONNECTIVITY, false);
-        if (LinphoneManager.isInstanciated()) {
-            LinphoneManager.getInstance().connectivityChanged(cm, lNoConnectivity);
-        }
-    }
+	@Override
+	public void onReceive(Context context, Intent intent) {
+		ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+		Boolean lNoConnectivity = intent.getBooleanExtra(ConnectivityManager.EXTRA_NO_CONNECTIVITY,false);
+		if (LinphoneManager.isInstanciated()) {
+			LinphoneManager.getInstance().connectivityChanged(cm, lNoConnectivity);
+		}
+	}
 
 }

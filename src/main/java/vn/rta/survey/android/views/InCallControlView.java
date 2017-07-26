@@ -368,7 +368,6 @@ public class InCallControlView {
         zeroButton = (ImageView) mView.findViewById(R.id.button0);
         starButton = (ImageView) mView.findViewById(R.id.button_star);
         shapeButton = (ImageView) mView.findViewById(R.id.button_shape);
-        doneButton = (LinearLayout) mView.findViewById(R.id.done_layout);
         phoneNumber = (TextView) mView.findViewById(R.id.number_sip);
         phoneNumber.setText("");
         endCallButtonInPad = (LinearLayout) mView.findViewById(R.id.end_call_layout);
@@ -386,6 +385,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("1");
                 phoneNumber.setText(numberCall.toString());
+                onDtmfListener.onDtmf(currentCall, '1');
             }
         });
 
@@ -394,6 +394,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("2");
                 phoneNumber.setText(numberCall.toString());
+                onDtmfListener.onDtmf(currentCall, '2');
             }
         });
 
@@ -402,7 +403,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("3");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '3');
             }
         });
 
@@ -411,7 +412,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("4");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '4');
             }
         });
 
@@ -420,7 +421,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("5");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '5');
             }
         });
 
@@ -429,7 +430,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("6");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '6');
             }
         });
 
@@ -438,7 +439,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("7");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '7');
             }
         });
 
@@ -447,6 +448,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("8");
                 phoneNumber.setText(numberCall.toString());
+                onDtmfListener.onDtmf(currentCall, '8');
             }
         });
         nineButton.setOnClickListener(new View.OnClickListener() {
@@ -454,7 +456,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("9");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '9');
             }
         });
 
@@ -463,6 +465,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("0");
                 phoneNumber.setText(numberCall.toString());
+                onDtmfListener.onDtmf(currentCall, '0');
             }
         });
 
@@ -471,7 +474,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("*");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '*');
             }
         });
 
@@ -480,7 +483,7 @@ public class InCallControlView {
             public void onClick(View v) {
                 numberCall.append("#");
                 phoneNumber.setText(numberCall.toString());
-
+                onDtmfListener.onDtmf(currentCall, '#');
             }
         });
 
@@ -490,24 +493,7 @@ public class InCallControlView {
                 if (numberCall.length() > 0) {
                     numberCall.deleteCharAt(numberCall.length() - 1);
                     phoneNumber.setText(numberCall.toString());
-
                 }
-            }
-        });
-
-        doneButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (numberCall.length() > 0) {
-                    if (numberCall.toString().contains("*") || numberCall.toString().contains("#"))
-                        return;
-                    int keycode = Integer.parseInt(numberCall.toString());
-                    onDtmfListener.onDtmf(currentCall, keycode, keycode);
-                    numberCall = new StringBuilder("");
-
-
-                }
-
             }
         });
 
@@ -698,6 +684,6 @@ public class InCallControlView {
     }
 
     public interface OnDtmfListener {
-        void onDtmf(LinphoneCall call, int keyCode, int dialTone);
+        void onDtmf(LinphoneCall call, char key);
     }
 }

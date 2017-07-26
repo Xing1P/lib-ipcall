@@ -110,7 +110,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
      */
     private boolean serviceConnected = false;
     private int mode = InCallControlView.MODE_INCALL_MAIN;
-    private LinphoneService service;
     private ServiceConnection connection;
     private AlertDialog infoDialog;
     private BroadcastReceiver callStateReceiver = new BroadcastReceiver() {
@@ -120,9 +119,9 @@ public class InIpCallService extends Service implements InCallControlView.Change
             String action = intent.getAction();
 
             if (action.equals(SipManager.ACTION_SIP_CALL_CHANGED)) {
-                if (service != null) {
+                if (LinphoneService.isReady()) {
                     synchronized (callMutex) {
-                        if ((service == null && !LinphoneService.isReady()) || LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc()).isEmpty())
+                        if ((!LinphoneService.isReady()) || LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc()).isEmpty())
                             return;
                         callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
                         for (int i = 0; i < callsInfo.size(); i++) {
@@ -214,7 +213,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
                     //TODO: Change UI when The call are on going after connected (after user pick the phone)
                 } else if (state == LinphoneCall.State.CallEnd || state == LinphoneCall.State.Error || state == LinphoneCall.State.CallReleased) {
                     //TODO: Close
-                    if (service == null && !LinphoneService.isReady())
+                    if (!LinphoneService.isReady())
                         return;
 
                     if (call != null) {
@@ -266,7 +265,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
             connection = new ServiceConnection() {
                 @Override
                 public void onServiceConnected(ComponentName arg0, IBinder arg1) {
-                    service = LinphoneService.instance();
                     // Log.d(THIS_FILE,
                     // "Service started get real call info "+callInfo.getCallId());
                     callsInfo = LinphoneUtils.getLinphoneCalls(LinphoneManager.getLc());
@@ -316,7 +314,6 @@ public class InIpCallService extends Service implements InCallControlView.Change
                     callsInfo = null;
                     incallView = null;
                     mView = null;
-                    service = null;
                 }
             };
 
@@ -460,11 +457,13 @@ public class InIpCallService extends Service implements InCallControlView.Change
 
             case MUTE_ON:
                 if (LinphoneService.isReady()) {
+                    //Mute mic -> enable mic = false
                     LinphoneManager.getInstance().setEnableMicro(false);
                 }
                 break;
             case MUTE_OFF: {
                 if (LinphoneService.isReady()) {
+                    //Unmute mic -> enable mic = true
                     LinphoneManager.getInstance().setEnableMicro(true);
                 }
                 break;
@@ -569,7 +568,7 @@ public class InIpCallService extends Service implements InCallControlView.Change
                     builder.setSingleChoiceItems(simpleAdapter, -1, new Dialog.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                            if (service != null) {
+                            if (LinphoneService.isReady()) {
                                 // 1 = PJSUA_XFER_NO_REQUIRE_REPLACES\
 
                                 LinphoneManager.getLc().transferCallToAnother(LinphoneManager.getLc().getCurrentCall(), remoteCalls.get(which));
@@ -641,12 +640,14 @@ public class InIpCallService extends Service implements InCallControlView.Change
     }
 
     @Override
-    public void onDtmf(LinphoneCall call, int keyCode, int dialTone) {
+    public void onDtmf(LinphoneCall call, char key) {
         //proximityManager.restartTimer();
-        if (service != null) {
-            if (call != null) {
-                LinphoneManager.getLc().sendDtmf((char) keyCode);
-                dialFeedback.giveFeedback(dialTone);
+        if (LinphoneService.isReady()) {
+            LinphoneManager.getLc().stopDtmf();
+            if (call != null && LinphoneManager.getLc().isIncall()) {
+                LinphoneManager.getLc().sendDtmf(key);
+                //LinphoneManager.getInstance().playDtmf(getApplicationContext().getContentResolver(), key);
+                dialFeedback.giveFeedback(1);
             }
         }
     }

@@ -2,8 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.rta.ipcall"
     android:installLocation="auto"
-    android:versionCode="3260"
-    android:versionName="3.2.6">
+    android:versionCode="3280"
+    android:versionName="3.2.8"> <!-- This version name change immediate when upgraded, so in the future if you want to upgrade Linphone, you must check the tag 3.2.8 also, not just begin from 3.2.9 tag -->
+
+    <uses-sdk
+        android:minSdkVersion="14"
+        android:targetSdkVersion="25"/>
 
     <supports-screens
         android:largeScreens="true"
@@ -20,7 +24,7 @@
     -->
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.READ_LOGS" />
-    <!--<uses-permission android:name="android.permission.WRITE_CALL_LOG" />-->
+    <!--<uses-permission android:name="android.permission.WRtITE_CALL_LOG" />-->
     <uses-permission android:name="android.permission.USE_SIP" />
     <uses-permission android:name="android.permission.CONFIGURE_SIP" />
     <uses-permission android:name="android.permission.READ_PROFILE" />

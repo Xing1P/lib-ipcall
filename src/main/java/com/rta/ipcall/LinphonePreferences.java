@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
+import android.util.Log;
 
 import org.linphone.core.LinphoneAddress;
 import org.linphone.core.LinphoneAddress.TransportType;
@@ -37,7 +39,6 @@ import org.linphone.core.LinphoneNatPolicy;
 import org.linphone.core.LinphoneProxyConfig;
 import org.linphone.core.LpConfig;
 import org.linphone.core.TunnelConfig;
-import org.linphone.mediastream.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -50,6 +51,7 @@ import java.io.InputStreamReader;
  */
 public class LinphonePreferences {
     private static final int LINPHONE_CORE_RANDOM_PORT = -1;
+    private static final String TAG = LinphonePreferences.class.getSimpleName();
     private static LinphonePreferences instance;
     private Context mContext;
     private String basePath;
@@ -109,7 +111,7 @@ public class LinphonePreferences {
                         text.append('\n');
                     }
                 } catch (IOException ioe) {
-                    Log.e(ioe);
+                    Log.e(TAG, ioe.getMessage());
                 }
                 return LinphoneCoreFactory.instance().createLpConfigFromString(text.toString());
             }
@@ -165,7 +167,7 @@ public class LinphonePreferences {
             LinphoneAuthInfo authInfo = getLc().findAuthInfo(addr.getUserName(), null, addr.getDomain());
             return authInfo;
         } catch (LinphoneCoreException e) {
-            Log.e(e);
+            Log.e(TAG, e.getMessage());
         }
 
         return null;
@@ -227,7 +229,7 @@ public class LinphonePreferences {
                     setAccountOutboundProxyEnabled(n, true);
                 }
             } catch (LinphoneCoreException e) {
-                Log.e(e);
+                Log.e(TAG, e.getMessage());
             }
         }
     }
@@ -242,7 +244,7 @@ public class LinphonePreferences {
                 proxyAddr = LinphoneCoreFactory.instance().createLinphoneAddress(proxyConfig.getProxy());
                 transport = proxyAddr.getTransport();
             } catch (LinphoneCoreException e) {
-                Log.e(e);
+                Log.e(TAG, e.getMessage());
             }
         }
 
@@ -290,7 +292,7 @@ public class LinphonePreferences {
                 saveAuthInfo(new_info);
             }
         } catch (LinphoneCoreException e) {
-            Log.e(e);
+            Log.e(TAG, e.getMessage());
         }
     }
 
@@ -308,16 +310,13 @@ public class LinphonePreferences {
             prxCfg.setIdentity(addr.asString());
             prxCfg.done();
         } catch (Exception e) {
-            Log.e(e);
+            Log.e(TAG, e.getMessage());
         }
     }
 
     public String getAccountDisplayName(int n) {
-        LinphoneAddress addr = getProxyConfig(n).getAddress();
-        if (addr != null) {
-            return addr.getDisplayName();
-        }
-        return null;
+        if (getProxyConfig(n) == null || getProxyConfig(n).getAddress() == null) return null;
+        return getProxyConfig(n).getAddress().getDisplayName();
     }
 
     public void setAccountUserId(int n, String userId) {
@@ -375,7 +374,7 @@ public class LinphonePreferences {
                 saveAuthInfo(new_info);
             }
         } catch (LinphoneCoreException e) {
-            Log.e(e);
+            Log.e(TAG, e.getMessage());
         }
     }
 
@@ -408,7 +407,7 @@ public class LinphonePreferences {
                 setAccountOutboundProxyEnabled(n, true);
             }
         } catch (LinphoneCoreException e) {
-            Log.e(e);
+            Log.e(TAG, e.getMessage());
         }
     }
 
@@ -430,7 +429,7 @@ public class LinphonePreferences {
             }
             prxCfg.done();
         } catch (LinphoneCoreException e) {
-            Log.e(e);
+            Log.e(TAG, e.getMessage());
         }
     }
 
@@ -546,6 +545,11 @@ public class LinphonePreferences {
 
     public void setAccountEnabled(int n, boolean enabled) {
         LinphoneProxyConfig prxCfg = getProxyConfig(n);
+        if (prxCfg == null) {
+            Log.e(TAG, "Error when enable account!");
+            //LinphoneUtils.displayErrorAlert("Error when enable account!", mContext);
+            return;
+        }
         prxCfg.edit();
         prxCfg.enableRegister(enabled);
         prxCfg.done();
@@ -583,11 +587,6 @@ public class LinphonePreferences {
     }
 
     public void deleteAccount(int n) {
-        LinphoneAuthInfo authInfo = getAuthInfo(n);
-        if (authInfo != null) {
-            getLc().removeAuthInfo(authInfo);
-        }
-
         LinphoneProxyConfig proxyCfg = getProxyConfig(n);
         if (proxyCfg != null)
             getLc().removeProxyConfig(proxyCfg);
@@ -595,6 +594,11 @@ public class LinphonePreferences {
             resetDefaultProxyConfig();
         } else {
             getLc().setDefaultProxyConfig(null);
+        }
+
+        LinphoneAuthInfo authInfo = getAuthInfo(n);
+        if (authInfo != null) {
+            getLc().removeAuthInfo(authInfo);
         }
 
         getLc().refreshRegisters();
@@ -908,11 +912,11 @@ public class LinphonePreferences {
             String appId = getString(R.string.push_sender_id);
             if (regId != null && lc.getProxyConfigList().length > 0) {
                 for (LinphoneProxyConfig lpc : lc.getProxyConfigList()) {
-                    String contactInfos = "app-id=" + appId + ";pn-type=" + getString(R.string.push_type) + ";pn-tok=" + regId;
+                    String contactInfos = "app-id=" + appId + ";pn-type=" + getString(R.string.push_type) + ";pn-tok=" + regId + ";pn-silent=1";
                     lpc.edit();
                     lpc.setContactUriParameters(contactInfos);
                     lpc.done();
-                    Log.d("Push notif infos added to proxy config " + lpc.getAddress().asStringUriOnly());
+                    Log.d(TAG, "Push notif infos added to proxy config " + lpc.getAddress().asStringUriOnly());
                 }
                 lc.refreshRegisters();
             }
@@ -922,7 +926,7 @@ public class LinphonePreferences {
                     lpc.edit();
                     lpc.setContactUriParameters(null);
                     lpc.done();
-                    Log.d("Push notif infos removed from proxy config " + lpc.getAddress().asStringUriOnly());
+                    Log.d(TAG, "Push notif infos removed from proxy config " + lpc.getAddress().asStringUriOnly());
                 }
                 lc.refreshRegisters();
             }
@@ -1072,7 +1076,7 @@ public class LinphonePreferences {
 
     public boolean isProvisioningLoginViewEnabled() {
 
-        return (getConfig() != null) && getConfig().getBool("app", "show_login_view", false);
+        return (getConfig() != null) ? getConfig().getBool("app", "show_login_view", false) : false;
     }
     // End of tunnel settings
 
@@ -1080,7 +1084,7 @@ public class LinphonePreferences {
         if (isProvisioningLoginViewEnabled()) { // Only do it if it was previously enabled
             getConfig().setBool("app", "show_login_view", false);
         } else {
-            Log.w("Remote provisioning login view wasn't enabled, ignoring");
+            Log.w(TAG, "Remote provisioning login view wasn't enabled, ignoring");
         }
     }
 
@@ -1233,11 +1237,21 @@ public class LinphonePreferences {
         getConfig().setBool("app", "auto_answer", enable);
     }
 
+    public int getAutoAnswerTime() {
+        return getConfig().getInt("app", "auto_answer_delay", 0);
+    }
+
+    public void setAutoAnswerTime(int time) {
+        getConfig().setInt("app", "auto_answer_delay", time);
+    }
+
     public int getCodeLength() {
         return getConfig().getInt("app", "activation_code_length", 0);
     }
 
     public boolean isDozeModeEnabled() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+            return false;
         return getConfig().getBool("app", "doze_mode", true);
     }
 
@@ -1393,7 +1407,7 @@ public class LinphonePreferences {
         public void saveNewAccount() throws LinphoneCoreException {
 
             if (tempUsername == null || tempUsername.length() < 1 || tempDomain == null || tempDomain.length() < 1) {
-                Log.w("Skipping account save: username or domain not provided");
+                Log.w(TAG, "Skipping account save: username or domain not provided");
                 return;
             }
 

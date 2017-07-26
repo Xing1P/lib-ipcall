@@ -4,14 +4,11 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
@@ -20,7 +17,7 @@ import android.widget.Toast;
 import com.rta.ipcall.LinphoneManager;
 import com.rta.ipcall.LinphonePreferences;
 import com.rta.ipcall.LinphoneService;
-import com.rta.ipcall.ui.UpdateUIListener;
+import com.rta.ipcall.ui.OnUpdateUIListener;
 
 import org.javarosa.core.model.FormIndex;
 import org.linphone.core.LinphoneAddress;
@@ -30,6 +27,7 @@ import org.linphone.core.LinphoneCoreListenerBase;
 import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.logic.FormController;
 
+import vn.rta.cpms.services.model.IpCallAccount;
 import vn.rta.cpms.utils.Common;
 import vn.rta.ipcall.api.SipConfigManager;
 import vn.rta.ipcall.api.SipManager;
@@ -37,7 +35,6 @@ import vn.rta.ipcall.api.SipProfile;
 import vn.rta.ipcall.api.SipUri;
 import vn.rta.ipcall.ui.AddressText;
 import vn.rta.ipcall.ui.IncomingIPCallActivity;
-import vn.rta.survey.android.BuildConfig;
 import vn.rta.survey.android.R;
 import vn.rta.survey.android.application.RTASurvey;
 import vn.rta.survey.android.entities.SIPProfile;
@@ -57,7 +54,7 @@ public class IPCallManager {
     private static final String TAG = IPCallManager.class.getSimpleName();
     private static final int PERMISSIONS_ENABLED_CAMERA = 203;
     private static IPCallManager instance;
-    public ServiceConnection connection;
+    private static boolean instantiated = false;
     public LinphoneService service;
     LinphoneManager.AddressType recipient;
     private boolean isRunning = false;
@@ -70,12 +67,31 @@ public class IPCallManager {
     private boolean globGsm = true;
     private SIPProfile sipProfile;
     private LinphoneCoreListenerBase mListener;
+    private OnUpdateUIListener updateUIListener;
 
     private SipCallUpdateUIListener listener;
     private SaveCurrentAnswerListener saveListener;
     private FormEntryActivity mEntryActivity;
 
     private IPCallManager() {
+    }
+
+    public static IPCallManager getInstance() {
+        if (instance == null) {
+            instance = new IPCallManager();
+        }
+
+        return instance;
+    }
+
+    public static boolean isInstantiated() {
+        return instantiated;
+    }
+
+    public synchronized void initialize() {
+        if (mListener != null && LinphoneManager.isInstanciated()) {
+            LinphoneManager.getLc().removeListener(mListener);
+        }
         mListener = new LinphoneCoreListenerBase() {
             //Control overall services
             @Override
@@ -86,12 +102,10 @@ public class IPCallManager {
                 }
             }
         };
-    }
+        if (LinphoneManager.isInstanciated())
+            LinphoneManager.getLc().addListener(mListener);
 
-    public static IPCallManager getInstance() {
-        if (instance == null)
-            instance = new IPCallManager();
-        return instance;
+        instantiated = true;
     }
 
     public void setFormEntryActivity(FormEntryActivity activity) {
@@ -104,15 +118,43 @@ public class IPCallManager {
 
     public void setUpdateUIListener(final SipCallUpdateUIListener listener) {
         this.listener = listener;
-        LinphoneService.setOnUpdateUIListener(new UpdateUIListener() {
+
+        if (updateUIListener != null && LinphoneService.isReady()) {
+            LinphoneService.removeOnUpdateUIListener(updateUIListener);
+        }
+        updateUIListener = new OnUpdateUIListener() {
+            @Override
+            public void registrationState(boolean isConnected, String statusMessage) {
+                if (isConnected) {
+                    listener.updateCallButton(true, statusMessage);
+                    isRunning = true;
+                }
+                else {
+                    listener.updateCallButton(false, statusMessage);
+                    isRunning = false;
+                }
+            }
+
             @Override
             public void updateUIByServiceStatus(boolean isConnected) {
-                listener.updateCallButton(isConnected);
+                if (isConnected) {
+                    IPCallManager.getInstance().initialize();
+                    service = LinphoneService.instance();
+                    listener.updateCallButton(true, "IPCall service started!");
+                    isBound = true;
+                    isRunning = true;
+                    LinphoneManager.getInstance().genericLogIn(sipProfile.getUserName(), sipProfile.getPassword(), null, sipProfile.getUrl(), LinphoneAddress.TransportType.LinphoneTransportUdp);
+                } else {
+                    service = null;
+                    listener.updateCallButton(false, "IPCall service is not started");
+                    isRunning = false;
+                }
             }
 
             @Override
             public void updateToCallWidget(boolean isCalled) {
-                listener.updateToCallWidget(isCalled);
+                if (listener != null)
+                    listener.updateToCallWidget(isCalled);
             }
 
             @Override
@@ -124,7 +166,8 @@ public class IPCallManager {
             @Override
             public void dismissCallActivity() {
             }
-        });
+        };
+        LinphoneService.addOnUpdateUIListener(updateUIListener);
     }
 
     public void setSaveListener(SaveCurrentAnswerListener listener) {
@@ -139,6 +182,7 @@ public class IPCallManager {
         if (isRunning)
             return;
 
+        Log.e("IPCall", "Connecting to server");
         Intent serviceIntent = new Intent(Intent.ACTION_MAIN);
         serviceIntent.setClass(mEntryActivity, LinphoneService.class);
 
@@ -151,39 +195,16 @@ public class IPCallManager {
 
         //TODO: Call listener to update call button when ready
         if (LinphoneService.isReady()) {
+            IPCallManager.getInstance().initialize();
             service = LinphoneService.instance();
             isRunning = true;
-            listener.updateCallButton(true);
-            LinphoneManager.getInstance().prepareLogIn();
             LinphoneManager.getInstance().genericLogIn(sipProfile.getUserName(), sipProfile.getPassword(), null, sipProfile.getUrl(), LinphoneAddress.TransportType.LinphoneTransportUdp);
         } else {
             serviceIntent.setPackage(mEntryActivity.getPackageName());
-            connection = new ServiceConnection() {
-                @Override
-                public void onServiceConnected(ComponentName arg0, IBinder arg1) {
-                    service = LinphoneService.instance();
-                    isRunning = true;
-                    isBound = true;
-                    listener.updateCallButton(true);
-                    LinphoneManager.getInstance().prepareLogIn();
-                    LinphoneManager.getInstance().genericLogIn(sipProfile.getUserName(), sipProfile.getPassword(), null, sipProfile.getUrl(), LinphoneAddress.TransportType.LinphoneTransportUdp);
-                }
-
-                @Override
-                public void onServiceDisconnected(ComponentName arg0) {
-                    service = null;
-                    listener.updateCallButton(false);
-                    isRunning = false;
-                }
-            };
-
-            mEntryActivity.bindService(serviceIntent, connection,
-                    Context.BIND_AUTO_CREATE);
             startSipService(serviceIntent);
         }
     }
 
-    @Deprecated
     private void startSipService(final Intent serviceIntent) {
         Thread t = new Thread("StartSip") {
             public void run() {
@@ -192,8 +213,6 @@ public class IPCallManager {
                 if (!LinphoneService.isReady()) {
                     serviceIntent.putExtra(SipManager.EXTRA_OUTGOING_ACTIVITY, new ComponentName(mEntryActivity, FormEntryActivity.class));
                     mEntryActivity.startService(serviceIntent);
-                    if (BuildConfig.FLAVOR.equals("rtcpms"))
-                        LinphoneManager.setAllowIncomingCall(true);
                 }
             }
         };
@@ -381,7 +400,7 @@ public class IPCallManager {
 
     public void requestPermissionAndToggleVideo() {
         int camera = mEntryActivity.getPackageManager().checkPermission(Manifest.permission.CAMERA, mEntryActivity.getPackageName());
-        org.linphone.mediastream.Log.i("[Permission] Camera permission is " + (camera == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));
+        Log.i(TAG, "[Permission] Camera permission is " + (camera == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));
 
         if (camera == PackageManager.PERMISSION_GRANTED) {
             LinphoneManager.getInstance().toggleVideo();
@@ -393,11 +412,11 @@ public class IPCallManager {
 
     public void checkAndRequestPermission(String permission, int result) {
         int permissionGranted = mEntryActivity.getPackageManager().checkPermission(permission, mEntryActivity.getPackageName());
-        org.linphone.mediastream.Log.i("[Permission] " + permission + " is " + (permissionGranted == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));
+        Log.i(TAG, "[Permission] " + permission + " is " + (permissionGranted == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"));
 
         if (permissionGranted != PackageManager.PERMISSION_GRANTED) {
             if (LinphonePreferences.instance().firstTimeAskingForPermission(permission) || ActivityCompat.shouldShowRequestPermissionRationale(mEntryActivity, permission)) {
-                org.linphone.mediastream.Log.i("[Permission] Asking for " + permission);
+                Log.i(TAG, "[Permission] Asking for " + permission);
                 ActivityCompat.requestPermissions(mEntryActivity, new String[]{permission}, result);
             }
         }
@@ -438,35 +457,51 @@ public class IPCallManager {
 
     public void cleanConfigs(Activity activity) {
         if (activity != null && LinphoneService.isReady()) {
+            //Remove listeners
+            if (updateUIListener != null)
+                LinphoneService.removeOnUpdateUIListener(updateUIListener);
+            LinphoneCore lc = LinphoneManager.getLcIfManagerNotDestroyedOrNull();
+            if (lc != null) {
+                lc.removeListener(mListener);
+            }
+
             if (!LinphoneManager.isAllowIncomingCall()) {
-                if (connection != null)
-                    activity.unbindService(connection);
-                activity.stopService(new Intent(activity, LinphoneService.class));
+                //If do not allow receiving incoming call -> stop service
+                activity.stopService(new Intent(Intent.ACTION_MAIN).setClass(activity, LinphoneService.class));
             } else {
                 //Is allow incoming call (rtWork)
-                //Exit form ipcall user
-                LinphonePreferences prefs = LinphonePreferences.instance();
-                int count = prefs.getAccountCount();
-                if (count > 0)
-                    prefs.deleteAccount(count - 1); //Delete last account
-
-                if (Common.getUserInfo(activity).getIpcall() == null) {
+                IpCallAccount account = Common.getUserInfo(activity).getIpcall();
+                if (account == null || account.getUser().isEmpty() || account.getUrl().isEmpty()) {
                     //No global ipcall user -> stop service
-                    activity.stopService(new Intent(activity, LinphoneService.class));
+                    activity.stopService(new Intent(Intent.ACTION_MAIN).setClass(activity, LinphoneService.class));
+                } else {
+                    //Exit form ipcall user
+                    LinphonePreferences prefs = LinphonePreferences.instance();
+                    int count = prefs.getAccountCount();
+                    try {
+                        if (count > 1) { //Leave 1 account alive
+                            prefs.setDefaultAccount(count - 2);
+                            prefs.deleteAccount(count - 1); //Delete last account
+                            Log.e("IPCall", "Form IPCall account removed!");
+                        }
+                    }
+                    catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
             }
+            instantiated = false;
             isRunning = false;
             isBound = false;
             service = null;
-            connection = null;
         }
     }
 
     //Additional
     enum Profile {
         UNKOWN,
-        ALWAYS,
-        WIFI,
-        NEVER
+                ALWAYS,
+                WIFI,
+                NEVER
     }
 }

@@ -21,30 +21,30 @@ package com.rta.ipcall;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
 import org.linphone.core.LinphoneCoreFactory;
 import org.linphone.core.LpConfig;
-import org.linphone.mediastream.Log;
 
 public class BootReceiver extends BroadcastReceiver {
 
-    @Override
-    public void onReceive(Context context, Intent intent) {
-        if (intent.getAction().equalsIgnoreCase(Intent.ACTION_SHUTDOWN)) {
-            Log.w("Device is shutting down, destroying LinphoneCore to unregister");
-            LinphoneManager.destroy();
-        } else {
-            String path = context.getFilesDir().getAbsolutePath() + "/.linphonerc";
-            LpConfig lpConfig = LinphoneCoreFactory.instance().createLpConfig(path);
-            boolean autostart = lpConfig.getBool("app", "auto_start", false);
-            android.util.Log.i("LinphoneBootReceiver", "Device is starting, auto_start is " + autostart);
-            if (autostart) {
-                if (!LinphoneService.isReady()) {
-                    Intent lLinphoneServiceIntent = new Intent(Intent.ACTION_MAIN);
-                    lLinphoneServiceIntent.setClass(context, LinphoneService.class);
-                    context.startService(lLinphoneServiceIntent);
-                }
-            }
-        }
-    }
+	@Override
+	public void onReceive(Context context, Intent intent) {
+		if (intent.getAction().equalsIgnoreCase(Intent.ACTION_SHUTDOWN)) {
+			Log.w(BootReceiver.class.getSimpleName(), "Device is shutting down, destroying LinphoneCore to unregister");
+			LinphoneManager.destroy();
+		} else {
+			String path = context.getFilesDir().getAbsolutePath() + "/.linphonerc";
+			LpConfig lpConfig = LinphoneCoreFactory.instance().createLpConfig(path);
+			boolean autostart = lpConfig.getBool("app", "auto_start", false);
+			android.util.Log.i("LinphoneBootReceiver", "Device is starting, auto_start is " + autostart);
+			if (autostart) {
+				if (!LinphoneService.isReady()) {
+					Intent lLinphoneServiceIntent = new Intent(Intent.ACTION_MAIN);
+					lLinphoneServiceIntent.setClass(context, LinphoneService.class);
+					context.startService(lLinphoneServiceIntent);
+				}
+			}
+		}
+	}
 }

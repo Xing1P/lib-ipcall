@@ -41,11 +41,9 @@ import org.odk.collect.android.provider.InstanceProviderAPI;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -78,6 +76,7 @@ import vn.rta.cpms.services.sync.note.UserNoteSyncDbHelper;
 import vn.rta.cpms.tasks.ConnectionTask;
 import vn.rta.piwik.Contacts;
 import vn.rta.piwik.PiwikTrackerManager;
+import vn.rta.rtcenter.data.GetModuleService;
 import vn.rta.rtcenter.data.ModuleDbHelper;
 import vn.rta.survey.android.BuildConfig;
 import vn.rta.survey.android.R;
@@ -214,7 +213,6 @@ public class Common {
             return new String(buffer);
         } catch (IOException e) {
             e.printStackTrace();
-            Log.e("inspector", e.getLocalizedMessage());
         }
         return "";
     }
@@ -309,33 +307,22 @@ public class Common {
         // get the current logged in username if username arg is not determined
         if (username == null || username.equals("")) {
             username = RTASurvey.getInstance().getCredential(RTASurvey.KEY_CREDENTIAL_USERNAME);
-        }
-
-        File uFile = new File(context.getFilesDir() + File.separator + "user_info", username);
-        ObjectInputStream input = null;
-        UserInfo u = null;
-        try {
-            input = new ObjectInputStream(new FileInputStream(uFile));
-            u = (UserInfo) input.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (input != null) {
-                    input.close();
-                }
-            } catch (IOException ex) {
-                ex.printStackTrace();
+            if (username == null) {
+                Log.e(TAG, "ERROR:: Cannot get username value. Application is inactive");
+                return null;
             }
         }
 
+        File uFile = new File(context.getFilesDir() + File.separator + "user_info", username);
+        String json = Common.getFileContent(context, uFile.getAbsolutePath());
+        UserInfo u = (UserInfo) StringUtil.json2Object(json, UserInfo.class);
         if (u != null && u.getUsername() == null)
             u.setUsername(username);
         return u;
     }
 
     public static void updateStaffInfo(Context context, String host, String key, String username,
-                                      Logger log) {
+                                       Logger log) {
         // correct service URL
         String servicePath = null;
         if (context.getString(R.string.rta_platform_name).equals(SurveyConnectionService.SURVEY_PLATFORM)) {
@@ -379,23 +366,18 @@ public class Common {
             File uDir = new File(context.getFilesDir(), "user_info");
             uDir.mkdirs();
             File uFile = new File(uDir, uInfo.getUsername());
-
-            // write user object into file
-            ObjectOutputStream output = null;
+            PrintWriter writer = null;
             try {
-                output = new ObjectOutputStream(new FileOutputStream(uFile));
-                output.writeObject(uInfo);
+                writer = new PrintWriter(uFile);
+                String json = StringUtil.object2JSON(uInfo);
+                writer.write(json);
                 result = true;
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             } finally {
-                try {
-                    if (output != null) {
-                        output.flush();
-                        output.close();
-                    }
-                } catch (IOException ex) {
-                    ex.printStackTrace();
+                if (writer != null) {
+                    writer.flush();
+                    writer.close();
                 }
             }
         }
@@ -484,6 +466,9 @@ public class Common {
         //stop main service
         context.stopService(new Intent(context, ManagerService.class));
         context.stopService(new Intent(Intent.ACTION_MAIN).setClass(context, LinphoneService.class));
+        //ActivityManager am = (ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
+        //am.killBackgroundProcesses(context.getString(R.string.sync_account_type));
+        //android.os.Process.killProcess(android.os.Process.myPid());
 
         int userCount = UserListDbHelper.getInstance().getUserCount();
         if (activity != null) {
@@ -614,6 +599,7 @@ public class Common {
 
         //clean up module data
         ModuleDbHelper.getInstance().cleanAllData(app.getApplicationContext());
+        GetModuleService.clearDownloadStage(app.getApplicationContext());
 
         //Clean up add item to home
         app.cleanUpPinItemOfHome();

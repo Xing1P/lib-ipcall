@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/ip_call_mini_view_height"
+    android:background="#00c853"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical" >
+   <TextView
+       android:layout_width="wrap_content"
+       android:layout_height="wrap_content"
+       android:layout_centerVertical="true"
+       android:layout_marginLeft="16dp"
+       android:text="@string/tap_to_return_to_call"
+       android:textColor="@color/white"
+       android:textSize="@dimen/ip_call_btn_text_size"/>
+    <Chronometer
+        android:id="@+id/miniElapsedTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="16dp"
+        android:textColor="@color/white"
+        android:textSize="@dimen/ip_call_btn_text_size" />
+</RelativeLayout>
